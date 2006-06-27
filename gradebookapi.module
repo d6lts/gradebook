@@ -11,6 +11,23 @@
  *   A fully-populated gradebook object.
  */
 function gradebookapi_load_gradebook($param = array()) {
+  $arguments = array();
+  if (is_numeric($param)) {
+    $cond = 'gid = %d';
+    $arguments[] = $param;
+  }
+  else {
+    // Turn the conditions into a query.
+    foreach ($param as $key => $value) {
+      $cond[] = db_escape_string($key) ." = '%s'";
+      $arguments[] = $value;
+    }
+    $cond = implode(' AND ', $cond);
+  }
+  
+  $gradebook = db_fetch_object(db_query('SELECT gid, name, nid, sid FROM {gradebookapi_gradebook} WHERE '. $cond, $arguments));
+  
+  return $gradebook;
 };
 
 /**
@@ -20,6 +37,40 @@ function gradebookapi_load_gradebook($param = array()) {
  *   The gradebook object. If the gid member is not set, a new gradebook will be inserted into the DB.
  */
 function gradebookapi_save_gradebook(&$gradebook) {
+  $gradebook->is_new = false;
+
+  if (empty($gradebook->gid)) {
+    $gradebook->is_new = true;
+    $gradebook->gid = db_next_id('{gradebookapi_gradebook}_gid');
+  }
+
+  $values = array(
+    'gid' => $gradebook->gid,
+    'name' => $gradebook->name,
+    'nid' => $gradebook->nid,
+    'sid' => $gradebook->sid,
+  );
+  $types = array(
+    'gid' => '%d',
+    'name' => '%s',
+    'nid' => '%d',
+    'sid' => '%d',
+  );
+  
+  if ($gradebook->is_new) {
+    $query = 'INSERT INTO {gradebookapi_gradebook} ('. implode(', ', array_keys($types)) .') VALUES ('. implode(', ', $types) .')';
+  }
+  else {
+    $arr = array();
+    foreach ($types as $key => $value) {
+      $arr[] = $key .' = '. $value;
+    }
+    $values[] = $gradebook->gid;
+    
+    $query = 'UPDATE {gradebookapi_gradebook} SET '. implode(', ', $arr) .' WHERE gid = %d';
+  }
+  
+  db_query($query, $values);
 };
 
 /**
@@ -29,6 +80,8 @@ function gradebookapi_save_gradebook(&$gradebook) {
  *   The gid of the gradebook
  */
 function gradebookapi_delete_gradebook($gid) {
+  $gradebook = gradebookapi_load_gradebook($gid);
+  db_query('DELETE FROM {gradebookapi_gradebook} WHERE gid = %d', $gradebook->gid);
 };
 
 /**
@@ -125,7 +178,7 @@ function gradebookapi_delete_assignment($aid) {
  * Load a grade object from the database.
  *
  * @param $param
- *   Either the did of the grade or an array of conditions to match against in the database query
+ *   Either the grid of the grade or an array of conditions to match against in the database query
  *
  * @return
  *   A fully-populated grade object.
