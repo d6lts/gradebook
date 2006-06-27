@@ -1,0 +1,179 @@
+<?php
+// $Id$
+
+/**
+ * Load a gradebook object from the database.
+ *
+ * @param $param
+ *   Either the gid of the gradebook or an array of conditions to match against in the database query
+ *
+ * @return
+ *   A fully-populated gradebook object.
+ */
+function gradebookapi_load_gradebook($param = array()) {
+};
+
+/**
+ * Save a gradebook object into the database.
+ *
+ * @param $gradebook
+ *   The gradebook object. If the gid member is not set, a new gradebook will be inserted into the DB.
+ */
+function gradebookapi_save_gradebook(&$gradebook) {
+};
+
+/**
+ * Delete a gradebook.
+ *
+ * @param $gid
+ *   The gid of the gradebook
+ */
+function gradebookapi_delete_gradebook($gid) {
+};
+
+/**
+ * Load a scale object from the database.
+ *
+ * @param $param
+ *   Either the sid of the scale or an array of conditions to match against in the database query
+ *
+ * @return
+ *   A fully-populated scale object.
+ */
+function gradebookapi_load_scale($param = array()) {
+};
+
+/**
+ * Save a scale object into the database.
+ *
+ * @param $scale
+ *   The scale object. If the sid member is not set, a new scale will be inserted into the DB.
+ */
+function gradebookapi_save_scale(&$scale) {
+};
+
+/**
+ * Delete a scale.
+ *
+ * @param $sid
+ *   The sid of the scale
+ */
+function gradebookapi_delete_scale($sid) {
+};
+
+/**
+ * Load a category object from the database.
+ *
+ * @param $param
+ *   Either the sid of the category or an array of conditions to match against in the database query
+ *
+ * @return
+ *   A fully-populated category object.
+ */
+function gradebookapi_load_category($param = array()) {
+};
+
+/**
+ * Save a category object into the database.
+ *
+ * @param $category
+ *   The category object. If the cid member is not set, a new category will be inserted into the DB.
+ */
+function gradebookapi_save_category(&$category) {
+};
+
+/**
+ * Delete a category.
+ *
+ * @param $cid
+ *   The cid of the category
+ */
+function gradebookapi_delete_category($cid) {
+};
+
+/**
+ * Load an assignment object from the database.
+ *
+ * @param $param
+ *   Either the aid of the assignment or an array of conditions to match against in the database query
+ *
+ * @return
+ *   A fully-populated assignment object.
+ */
+function gradebookapi_load_assignment($param = array()) {
+};
+
+/**
+ * Save an assignment object into the database.
+ *
+ * @param $assignment
+ *   The assignment object. If the aid member is not set, a new assignment will be inserted into the DB.
+ */
+function gradebookapi_save_assignment(&$assignment) {
+};
+
+/**
+ * Delete a assignment.
+ *
+ * @param $aid
+ *   The aid of the assignment
+ */
+function gradebookapi_delete_assignment($aid) {
+};
+
+/**
+ * Load a grade object from the database.
+ *
+ * @param $param
+ *   Either the did of the grade or an array of conditions to match against in the database query
+ *
+ * @return
+ *   A fully-populated grade object.
+ */
+function gradebookapi_load_grade($param = array()) {
+};
+
+/**
+ * Save a grade object into the database.
+ *
+ * @param $assignment
+ *   The grade object. If the did member is not set, a new grade will be inserted into the DB.
+ */
+function gradebookapi_save_grade(&$grade) {
+};
+
+/**
+ * Delete a grade.
+ *
+ * @param $grid
+ *   The grid of the grade
+ */
+function gradebookapi_delete_grade($grid) {
+};
+
+/**
+ * Load a totals object from the database.
+ *
+ * @param $param
+ *   An array of conditions to match against in the database query
+ *
+ * @return
+ *   A fully-populated totals object.
+ */
+function gradebookapi_load_totals($param = array()) {
+};
+
+/**
+ * Implementation of hook_elements()
+ * Allows for creation of custom elements (scale element, etc) for the Form API
+ */
+/*
+function gradebookapi_elements() {
+};
+*/
+
+/*
+function hook_gradebook_assignment() {
+};
+*/
+
