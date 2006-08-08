@@ -82,12 +82,50 @@ function gradebook_menu($may_cache) {
 
 // hook_settings
 // TODO: break out hard coded settings
-/*
 function gradebook_settings() {
+  $form = array();
+  
+  $roles = user_roles();
+  unset($roles[DRUPAL_ANONYMOUS_RID]);
+  
+  $sel_roles = (array) variable_get('gradebook_student_rids', array());
+  $default = array();
+  foreach ($sel_roles as $rid => $value) {
+    if ($value) {
+      $default[] = $rid;
+    }
+  }
+  $form['gradebook_student_rids'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Student roles'),
+    '#default_value' => $default,
+    '#options' => $roles,
+    '#description' =>  t('Check at least one role.'),
+    '#required' => TRUE,
+  );
+  
+  $sel_roles = (array) variable_get('gradebook_teacher_rids', array());
+  $default = array();
+  foreach ($sel_roles as $rid => $value) {
+    if ($value) {
+      $default[] = $rid;
+    }
+  }
+  $form['gradebook_teacher_rids'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Teacher roles'),
+    '#default_value' => $default,
+    '#options' => $roles,
+    '#description' =>  t('Check at least one role.'),
+    '#required' => TRUE,
+  );
+  
+  return $form;
 }
-*/
 
 function gradebook_page() {
+  global $user;
+  
   $vid = _gradebook_get_vid();
   $tree = taxonomy_get_tree($vid);
   $tids = array_map('_taxonomy_get_tid_from_term', $tree);
@@ -95,14 +133,24 @@ function gradebook_page() {
   $header = array('');
   $rows = array();
   
-  $result = taxonomy_select_nodes($tids);
+  // taxonomy_select_nodes($tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC')
+  $result = taxonomy_select_nodes($tids, 'or', 0, FALSE, 'n.created ASC');
   while ($node = db_fetch_object($result)) {
+    $node = node_load($node->nid);
     $nodes[] = $node;
-    $header[] = l($node->title, 'node/'.$node->nid);
+    $header[] = l($node->title, 'node/'.$node->nid) . '<br />' . $node->possible;
   }
+  $header[] = ''; // total grade
 
   // TODO: how should we render categories?
-  $result = db_query("SELECT uid, name FROM {users} WHERE uid > 1 AND status != 0 ORDER BY name ASC");
+  if (user_access('view gradebook')) {
+    //$result = db_query("SELECT uid, name FROM {users} WHERE uid > 1 AND status != 0 ORDER BY name ASC");
+    $str_rids = implode(',', array_keys(_gradebook_student_roles()));
+    $result = db_query("SELECT u.uid, u.name FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status != 0 AND r.rid IN (". $str_rids .") ORDER BY u.name ASC");
+  }
+  else {
+    $result = db_query("SELECT uid, name FROM {users} WHERE uid=%d", $user->uid);
+  }
   while ($account = db_fetch_object($result)) {
     $row = array();
     $row[] = theme('username', $account);
@@ -110,6 +158,8 @@ function gradebook_page() {
       $grade = gradebook_get_grade($account->uid, $node->nid);
       $row[] = l(($grade->earned?$grade->earned:'-'), 'gradebook/grade/'.$account->uid.'/'.$node->nid);
     }
+    $grade = _gradebook_get_total_grade($account->uid);
+    $row[] = $grade->earned . '/' . $grade->possible;
     $rows[] = $row;
   }
   
@@ -227,9 +277,13 @@ function gradebook_grade_form($edit = array()) {
   );
   
   $form['possible'] = array(
-    '#value' => 'Possible: ' . $edit['possible'] . "<br />\n",
+    '#value' => 'Possible: ' . $node->possible . "<br />\n",
   );
 
+  $form['overage'] = array(
+    '#value' => 'Overage: ' . ($node->overage?'Yes':'No') . "<br />\n",
+  );
+  
   $form['earned'] = array(
     '#title' => t('Earned'),
     '#type' => 'textfield',
@@ -253,6 +307,21 @@ function gradebook_grade_form($edit = array()) {
   );
 
   return drupal_get_form('gradebook_grade_form', $form, 'gradebook_form');
+}
+
+function gradebook_grade_form_validate($form_id, $form_values) {
+  $account = user_load(array('uid' => $form_values['uid']));
+  $node = node_load($form_values['nid']);
+  
+  if (!$account || !$node) {
+    form_set_error('', t('The UID/NID has an error.'));
+  }
+
+  if (!$node->overage) {
+    if ($form_values['earned'] > $node->possible) {
+      form_set_error('earned', t('You can not enter a value over the possible value for this assignment.'));
+    }
+  }
 }
 
 function gradebook_grade_form_submit($form_id, $form_values) {
@@ -302,6 +371,12 @@ function gradebook_assignment_form_elements($node) {
     '#required' => TRUE,
   );
   
+  $form['overage'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Overage'),
+    '#default_value' => ($node->overage?$node->overage:'0'),
+  );
+  
   return $form;
 }
 
@@ -316,16 +391,26 @@ function gradebook_assignment_submit(&$node) {
 }
 
 function gradebook_assignment_load($node) {
-  $additions = db_fetch_object(db_query('SELECT possible FROM {gradebook_assignment} WHERE nid = %d', $node->nid));
+  $additions = db_fetch_object(db_query('SELECT possible, overage FROM {gradebook_assignment} WHERE nid = %d', $node->nid));
   return $additions;
 } 
 
 function gradebook_assignment_insert($node) {
-  db_query("INSERT INTO {gradebook_assignment} (nid, possible) VALUES (%d, %d)", $node->nid, $node->possible);
+  db_query("INSERT INTO {gradebook_assignment} (nid, possible, overage) VALUES (%d, %d, %d)", $node->nid, $node->possible, $node->overage);
+  
+  $terms = taxonomy_node_get_terms_by_vocabulary($node->nid, _gradebook_get_vid());
+  foreach ($terms as $term) {
+    _gradebook_calc_grades(0, $term->tid);
+  }
 }
 
 function gradebook_assignment_update($node) {
-  db_query("UPDATE {gradebook_assignment} SET possible = '%s'WHERE nid = %d", $node->possible, $node->nid);
+  db_query("UPDATE {gradebook_assignment} SET possible = '%s', overage = %d WHERE nid = %d", $node->possible, $node->overage, $node->nid);
+  
+  $terms = taxonomy_node_get_terms_by_vocabulary($node->nid, _gradebook_get_vid());
+  foreach ($terms as $term) {
+    _gradebook_calc_grades(0, $term->tid);
+  }
 }
 
 function gradebook_assignment_delete($node) {
@@ -342,7 +427,7 @@ function gradebook_get_grade($uid, $nid) {
     'WHERE g.uid=%d AND g.nid=%d', $uid, $nid);
   $grade = db_fetch_object($result);
   
-  // add possible grade
+  // add 'possible' grade
   $result = db_query(
     'SELECT a.possible '.
     'FROM {gradebook_assignment} a '.
@@ -366,6 +451,11 @@ function gradebook_set_grade($grade) {
   }
   else {
     db_query("INSERT INTO {gradebook_grade} (uid, nid, earned, timestamp) VALUES (%d, %d, %d, %d)", $grade->uid, $grade->nid, $grade->earned, $grade->timestamp); 
+  }
+  
+  $terms = taxonomy_node_get_terms_by_vocabulary($grade->nid, _gradebook_get_vid());
+  foreach ($terms as $term) {
+    _gradebook_calc_grades($grade->uid, $term->tid);
   }
 }
 
@@ -435,4 +525,106 @@ function _gradebook_parent_select($tid, $title) {
 function _gradebook_confirm_delete($tid) {
   // TODO: handle term deletion
   //       see forum.module code
+}
+
+function _gradebook_student_roles() {
+  $roles = user_roles();
+  unset($roles[DRUPAL_ANONYMOUS_RID]);
+  unset($roles[DRUPAL_AUTHENTICATED_RID]);
+  
+  $sel_roles = (array) variable_get('gradebook_student_rids', array());
+  foreach ($sel_roles as $rid => $value) {
+    if (!$value) {
+      unset($roles[$rid]);
+    }
+  }
+  
+  return $roles;
+}
+
+function _gradebook_teacher_roles() {
+  $roles = user_roles();
+  unset($roles[DRUPAL_ANONYMOUS_RID]);
+  unset($roles[DRUPAL_AUTHENTICATED_RID]);
+  
+  $sel_roles = (array) variable_get('gradebook_teacher_rids', array());
+  foreach ($sel_roles as $rid => $value) {
+    if (!$value) {
+      unset($roles[$rid]);
+    }
+  }
+  
+  return $roles;
+}
+
+function _gradebook_calc_grades($uid, $tid) {
+  $earned = 0;
+  $possible = 0;
+  
+  // if UID is < 1, calc grades for ALL users
+  if (!$uid) {
+    return _gradebook_calc_grades_all_users($tid);
+  }
+  
+  // clear cache
+  db_query("DELETE FROM {gradebook_cache} WHERE tid=%d AND uid=%d", $tid, $uid); 
+  
+  // get grades from child terms
+  $children = taxonomy_get_children($tid, _gradebook_get_vid());
+  foreach ($children as $child) {
+    $grade = _gradebook_get_term_grade($uid, $child->tid);
+    if ($grade) {
+      $earned += $grade->earned;
+      $possible += $grade->possible;
+    }
+  }
+  
+  // get grades from nodes at this term
+  $result = taxonomy_select_nodes(array($tid), 'or', 0, FALSE);
+  while ($node = db_fetch_object($result)) {
+    $grade = gradebook_get_grade($uid, $node->nid);
+    if ($grade) {
+      $earned += $grade->earned;
+      $possible += $grade->possible;
+    }
+  }
+  
+  // cache grade
+  db_query("INSERT INTO {gradebook_cache} (uid, tid, earned, possible) VALUES (%d, %d, %d, %d)", $uid, $tid, $grade->earned, $grade->possible); 
+  
+  // recalc parents
+  $parents = taxonomy_get_parents($tid);
+  foreach ($parents as $parent) {
+    _gradebook_calc_grades($uid, $parent->tid);
+  }
+}
+
+function _gradebook_calc_grades_all_users($tid) {
+  $str_rids = implode(',', array_keys(_gradebook_student_roles()));
+  $result = db_query("SELECT u.uid, u.name FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status != 0 AND r.rid IN (". $str_rids .") ORDER BY u.name ASC");
+  while ($account = db_fetch_object($result)) {
+    _gradebook_calc_grades($account->uid, $tid);
+  }
+}
+
+function _gradebook_get_term_grade($uid, $tid) {
+  $result = db_query("SELECT earned, possible FROM {gradebook_cache} WHERE tid=%d AND uid=%d", $tid, $uid);
+  $grade = db_fetch_object($result);
+  return $grade;
+}
+
+function _gradebook_get_total_grade($uid) {
+  $total['earned'] = 0;
+  $total['possible'] = 0;
+  
+  $terms = taxonomy_get_tree(_gradebook_get_vid(), 0, -1, 1);
+  foreach ($terms as $term) {
+    $grade = _gradebook_get_term_grade($uid, $term->tid);
+    if ($grade) {
+      $total['earned'] += $grade->earned;
+      $total['possible'] += $grade->possible;
+    }
+  }
+  
+  return (object)$total;
 }
