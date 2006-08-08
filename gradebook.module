@@ -30,19 +30,17 @@ function gradebook_menu($may_cache) {
       'callback'  => 'gradebook_page',
     );
     $items[] = array(
-      'path' => 'gradebook/view',
-      'title' => t('view'),
-      'type' => MENU_DEFAULT_LOCAL_TASK,
-      'weight' => -10,
-    ); 
-    $items[] = array(
       'path'      =>  'gradebook/category',
       'title'    =>  t('categories'),
       'access' => user_access('edit gradebook'),
       'callback'  => 'gradebook_category_page',
-      'type'  => MENU_LOCAL_TASK,
     );
-    // TODO: why is this tab not showing?
+    $items[] = array(
+      'path' => 'gradebook/category/list',
+      'title' => t('list'),
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'weight' => -10,
+    );     
     $items[] = array(
       'path'      =>  'gradebook/category/add',
       'title'    =>  t('add category'),
@@ -156,7 +154,12 @@ function gradebook_page() {
     $row[] = theme('username', $account);
     foreach ($nodes as $node) {
       $grade = gradebook_get_grade($account->uid, $node->nid);
-      $row[] = l(($grade->earned?$grade->earned:'-'), 'gradebook/grade/'.$account->uid.'/'.$node->nid);
+      if (user_access('edit gradebook')) {
+        $row[] = l(($grade->earned?$grade->earned:'-'), 'gradebook/grade/'.$account->uid.'/'.$node->nid);
+      }
+      else {
+        $row[] = ($grade->earned?$grade->earned:'-');
+      }
     }
     $grade = _gradebook_get_total_grade($account->uid);
     $row[] = $grade->earned . '/' . $grade->possible;
