@@ -118,6 +118,14 @@ function gradebook_settings() {
     '#required' => TRUE,
   );
   
+  $form['gradebook_empty_grade'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Empty grade'),
+    '#default_value' => variable_get('gradebook_empty_grade', '--'),
+    '#description' =>  t('This the text displayed when no grade has been entered.'),
+    '#required' => TRUE,
+  );
+  
   return $form;
 }
 
@@ -155,10 +163,10 @@ function gradebook_page() {
     foreach ($nodes as $node) {
       $grade = gradebook_get_grade($account->uid, $node->nid);
       if (user_access('edit gradebook')) {
-        $row[] = l(($grade->earned?$grade->earned:'-'), 'gradebook/grade/'.$account->uid.'/'.$node->nid);
+        $row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), 'gradebook/grade/'.$account->uid.'/'.$node->nid);
       }
       else {
-        $row[] = ($grade->earned?$grade->earned:'-');
+        $row[] = ($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--'));
       }
     }
     $grade = _gradebook_get_total_grade($account->uid);
@@ -292,7 +300,7 @@ function gradebook_grade_form($edit = array()) {
     '#type' => 'textfield',
     '#default_value' => $edit['earned'],
     '#maxlength' =>  64,
-    '#description' => t('The greade earned.'),
+    '#description' => t('The grade earned.'),
     '#required' => TRUE
   );
 
@@ -403,7 +411,7 @@ function gradebook_assignment_insert($node) {
   
   $terms = taxonomy_node_get_terms_by_vocabulary($node->nid, _gradebook_get_vid());
   foreach ($terms as $term) {
-    _gradebook_calc_grades(0, $term->tid);
+    _gradebook_calc_grades(-1, $term->tid);
   }
 }
 
@@ -412,7 +420,7 @@ function gradebook_assignment_update($node) {
   
   $terms = taxonomy_node_get_terms_by_vocabulary($node->nid, _gradebook_get_vid());
   foreach ($terms as $term) {
-    _gradebook_calc_grades(0, $term->tid);
+    _gradebook_calc_grades(-1, $term->tid);
   }
 }
 
@@ -565,7 +573,7 @@ function _gradebook_calc_grades($uid, $tid) {
   $possible = 0;
   
   // if UID is < 1, calc grades for ALL users
-  if (!$uid) {
+  if ($uid<=0) {
     return _gradebook_calc_grades_all_users($tid);
   }
   
@@ -593,7 +601,7 @@ function _gradebook_calc_grades($uid, $tid) {
   }
   
   // cache grade
-  db_query("INSERT INTO {gradebook_cache} (uid, tid, earned, possible) VALUES (%d, %d, %d, %d)", $uid, $tid, $grade->earned, $grade->possible); 
+  db_query("INSERT INTO {gradebook_cache} (uid, tid, earned, possible) VALUES (%d, %d, %d, %d)", $uid, $tid, $earned, $possible);
   
   // recalc parents
   $parents = taxonomy_get_parents($tid);
