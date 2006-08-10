@@ -349,7 +349,7 @@ function gradebookapi_save_assignment(&$assignment) {
  *   The aid of the assignment
  */
 function gradebookapi_delete_assignment($aid) {
-  $assignment = gradebookapi_load_assignment(%aid)
+  $assignment = gradebookapi_load_assignment($aid);
 
   db_query('DELETE FROM {gradebookapi_grade} WHERE aid = %d', $aid);
   db_query('DELETE FROM {gradebookapi_assignment} WHERE aid = %d', $aid);
