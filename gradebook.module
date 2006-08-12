@@ -236,22 +236,16 @@ function gradebook_list() {
 }
 
 function gradebook_gradebook_page($gradebook) {
-  $nodes = array();
-  $header = array('');
-  $rows = array();
+  $assignments = array();
+  $student_grades = array();
 
   // gradebookapi_select_nodes($gradebook, $tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC')
   $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'n.created ASC');
   while ($node = db_fetch_object($result)) {
-    $node = node_load($node->nid);
-    $nodes[] = $node;
-    $header[] = l($node->title, 'node/'.$node->nid) . '<br />' . $node->possible;
+    $assignments[$node->nid] = node_load($node->nid);
   }
-  $header[] = ''; // total grade
 
-  // TODO: how should we render categories?
   if (user_access('view gradebook')) {
-    //$result = db_query("SELECT uid, name FROM {users} WHERE uid > 1 AND status != 0 ORDER BY name ASC");
     $str_rids = implode(',', array_keys(_gradebook_student_roles()));
     $result = db_query("SELECT u.uid, u.name FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status != 0 AND r.rid IN (". $str_rids .") ORDER BY u.name ASC");
   }
@@ -259,12 +253,38 @@ function gradebook_gradebook_page($gradebook) {
     $result = db_query("SELECT uid, name FROM {users} WHERE uid=%d", $user->uid);
   }
   while ($account = db_fetch_object($result)) {
+    $student_grades[$account->uid] = array();
+    foreach ($assignments as $assignment) {
+      $student_grades[$account->uid][$assignment->nid] = gradebookapi_get_grade($account->uid, $assignment->nid);
+    }
+    $student_grades[$account->uid]['total'] = gradebookapi_get_term_grade($account->uid, $gradebook->tid);
+  }
+  
+  return theme('gradebook_page', $gradebook, $assignments, $student_grades);
+}
+
+function theme_gradebook_page($gradebook, $assignments, $student_grades) {
+  $header = array();
+  $rows = array();
+  
+  //return 'theme_gradebook_page('.print_r($gradebook, TRUE).', '.print_r($assignments, TRUE).', '.print_r($student_grades, TRUE).')';
+  
+  // TODO: how should we render categories?
+  
+  $header[] = ''; // student name
+  foreach ($assignments as $assignment) {
+    $header[] = l($assignment->title, 'node/'.$assignment->nid) . '<br />' . $assignment->possible;
+  }
+  $header[] = ''; // total grade
+  
+  foreach ($student_grades as $uid => $grades) {
+    $account = user_load(array('uid'=>$uid));
     $row = array();
     $row[] = theme('username', $account);
-    foreach ($nodes as $node) {
-      $grade = gradebookapi_get_grade($account->uid, $node->nid);
+    foreach ($assignments as $assignment) {
+      $grade = $grades[$assignment->nid];
       if (user_access('edit gradebook')) {
-        $row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$node->nid);
+        $row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
       }
       else {
         $row[] = ($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--'));
@@ -274,7 +294,6 @@ function gradebook_gradebook_page($gradebook) {
     $row[] = $grade->earned . '/' . $grade->possible;
     $rows[] = $row;
   }
-  
   return theme('table', $header, $rows);
 }
 
