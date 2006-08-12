@@ -1,4 +1,5 @@
 <?php
+// $Id$
 
 // hook_help
 function assignment_help($section) {
@@ -6,7 +7,7 @@ function assignment_help($section) {
 
   switch ($section) {
     case 'admin/modules#description':
-      $output = t('Creates assignments.');
+      $output = t('A simple assignment node.');
       break;
 
     case 'node/add#assignment':
@@ -87,33 +88,33 @@ function assignment_form(&$node) {
   $form['body_filter']['filter'] = filter_form($node->format);
   
   // Get base form elements.
-  $form = array_merge($form, gradebook_assignment_form_elements($node));
+  $form = array_merge($form, gradebookapi_assignment_form_elements($node));
   
   return $form;
 }
 
 function assignment_validate(&$node) {
-  gradebook_assignment_validate($node);
+  gradebookapi_assignment_validate($node);
 }
 
 function assignment_submit(&$node) {
-  gradebook_assignment_submit($node);
+  gradebookapi_assignment_submit($node);
 }
 
 function assignment_load($node) {
-  return gradebook_assignment_load($node);
+  return gradebookapi_assignment_load($node);
 }
 
 function assignment_insert($node) {
-  gradebook_assignment_insert($node);
+  gradebookapi_assignment_insert($node);
 }
 
 function assignment_update($node) {
-  gradebook_assignment_update($node);
+  gradebookapi_assignment_update($node);
 }
 
 function assignment_delete($node) {
-  gradebook_assignment_delete($node);
+  gradebookapi_assignment_delete($node);
 }
 
 function assignment_form_submit() {

@@ -1,485 +1,348 @@
 <?php
 // $Id$
 
-/**
- * Load a gradebook object from the database.
- *
- * @param $param
- *   Either the gid of the gradebook or an array of conditions to match against in the database query
- *
- * @return
- *   A fully-populated gradebook object.
- */
-function gradebookapi_load_gradebook($param = array()) {
-  $arguments = array();
-  if (is_numeric($param)) {
-    $cond = 'gid = %d';
-    $arguments[] = $param;
+// hook_help
+function gradebookapi_help($section) {
+  switch ($section) {
+    case 'admin/modules#description':
+      // This description is shown in the listing at admin/modules.
+      return t('Provides a gradebook API.');
+  }
+}
+
+function gradebookapi_get_vid() {
+  $vid = variable_get('gradebookapi_nav_vocabulary', '');
+  if (empty($vid)) {
+    // Check to see if a forum vocabulary exists
+    $vid = db_result(db_query("SELECT vid FROM {vocabulary} WHERE module = '%s'", 'gradebook'));
+    if (!$vid) {
+      $edit = array(
+        'name' => 'Gradebook',
+        'multiple' => 0,
+        'required' => 1,
+        'hierarchy' => 1,
+        'relations' => 0,
+        'module' => 'gradebook',
+        'nodes' => array('assignment' => 1)
+      );
+      taxonomy_save_vocabulary($edit);
+      $vid = $edit['vid'];
+      
+      $edit = array(
+        'name' => 'default',
+        'description' => '',
+        'vid' => $vid,
+        'weight' => 0
+      );
+      taxonomy_save_term($edit);
+      variable_set('gradebookapi_default_tid', $edit['tid']);
+    }
+    variable_set('gradebookapi_nav_vocabulary', $vid);
+  }
+
+  return $vid;
+}
+
+function gradebookapi_default_gradebook_load() {
+  // get vid to make sure vocab exists
+  $vid = gradebookapi_get_vid();
+  $gid = variable_get('gradebookapi_default_tid', -1);
+  return gradebookapi_gradebook_load($gid);
+}
+
+function gradebookapi_gradebook_load($gid) {
+  if (_gradebookapi_is_root_term($gid)) {
+    return taxonomy_get_term($gid);
+  }
+  return FALSE;
+}
+
+function _gradebookapi_is_root_term($tid) {
+  $parents = taxonomy_get_parents($tid);
+  foreach ($parents as $parent) {
+    return FALSE;
+  }
+  return TRUE;
+}
+
+function gradebookapi_select_nodes($gradebook, $tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC') {
+  $vid = gradebookapi_get_vid();
+  $tree = taxonomy_get_tree($vid, $gradebook->tid);
+  $allowed_tids = array_map('_taxonomy_get_tid_from_term', $tree);
+  $use_tids = array();
+
+  if (!count($tids)) {
+    // use all tids in gradebook
+    $use_tids = $allowed_tids;
   }
   else {
-    // Turn the conditions into a query.
-    foreach ($param as $key => $value) {
-      $cond[] = db_escape_string($key) ." = '%s'";
-      $arguments[] = $value;
+    // make sure tids are only in gradebook
+    foreach ($tids as $tid) {
+      if (in_array($tid, $allowed_tids)) {
+        $use_tids[] = $tid;
+      }
     }
-    $cond = implode(' AND ', $cond);
   }
   
-  $gradebook = db_fetch_object(db_query('SELECT gid, nid, sid FROM {gradebookapi_gradebook} WHERE '. $cond, $arguments));
+  $tids[] = $gradebook->tid; // add in gradebook tid
   
-  return $gradebook;
-};
+  // taxonomy_select_nodes($tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC')
+  return taxonomy_select_nodes($use_tids, $operator, $depth, $pager, $order);
+}
 
-/**
- * Save a gradebook object into the database.
- *
- * @param $gradebook
- *   The gradebook object. If the gid member is not set, a new gradebook will be inserted into the DB.
- */
-function gradebookapi_save_gradebook(&$gradebook) {
-  $gradebook->is_new = false;
-
-  if (empty($gradebook->gid)) {
-    $gradebook->is_new = true;
-    $gradebook->gid = db_next_id('{gradebookapi_gradebook}_gid');
-  }
-
-  $values = array(
-    'gid' => $gradebook->gid,
-    'nid' => $gradebook->nid,
-    'sid' => $gradebook->sid,
-  );
-  $types = array(
-    'gid' => '%d',
-    'nid' => '%d',
-    'sid' => '%d',
-  );
+function gradebookapi_get_grade($uid, $nid) {
+  // try to get grade data
+  $result = db_query(
+    'SELECT g.earned, g.timestamp '.
+    'FROM {gradebookapi_grade} g '.
+    'WHERE g.uid=%d AND g.nid=%d', $uid, $nid);
+  $grade = db_fetch_object($result);
   
-  if ($gradebook->is_new) {
-    $query = 'INSERT INTO {gradebookapi_gradebook} ('. implode(', ', array_keys($types)) .') VALUES ('. implode(', ', $types) .')';
-  }
-  else {
-    $arr = array();
-    foreach ($types as $key => $value) {
-      $arr[] = $key .' = '. $value;
-    }
-    $values[] = $gradebook->gid;
-    
-    $query = 'UPDATE {gradebookapi_gradebook} SET '. implode(', ', $arr) .' WHERE gid = %d';
+  // add 'possible' grade
+  $result = db_query(
+    'SELECT a.possible '.
+    'FROM {gradebookapi_assignment} a '.
+    'WHERE a.nid=%d', $nid);
+  if ($assignment = db_fetch_object($result)) {
+    $grade->possible = $assignment->possible;
   }
   
-  db_query($query, $values);
-};
-
-/**
- * Delete a gradebook.
- *
- * @param $gid
- *   The gid of the gradebook
- */
-function gradebookapi_delete_gradebook($gid) {
-  $assignments = db_query('SELECT aid FROM {gradebookapi_assignment} WHERE gid = %d', $gid);
-  while ($assignment = db_fetch_object($assignments)) {
-    db_query('DELETE FROM {gradebookapi_grade} WHERE aid = %d', $assignment->aid);
-  }
-  db_query('DELETE FROM {gradebookapi_assignment} WHERE gid = %d', $gid);
-    
-  db_query('DELETE FROM {gradebookapi_category} WHERE gid = %d', $gid);
-  db_query('DELETE FROM {gradebookapi_scale} WHERE gid = %d', $gid);
-  db_query('DELETE FROM {gradebookapi_gradebook} WHERE gid = %d', $gid);
-  
-  _gradebookapi_clear_cache($gid);
-};
-
-/**
- * Load a scale object from the database.
- *
- * @param $param
- *   Either the sid of the scale or an array of conditions to match against in the database query
- *
- * @return
- *   A fully-populated scale object.
- */
-function gradebookapi_load_scale($param = array()) {
-  $arguments = array();
-  if (is_numeric($param)) {
-    $cond = 'sid = %d';
-    $arguments[] = $param;
-  }
-  else {
-    // Turn the conditions into a query.
-    foreach ($param as $key => $value) {
-      $cond[] = db_escape_string($key) ." = '%s'";
-      $arguments[] = $value;
-    }
-    $cond = implode(' AND ', $cond);
-  }
-  
-  $scale = db_fetch_object(db_query('SELECT sid, name, gid, weight, value FROM {gradebookapi_scale} WHERE '. $cond, $arguments));
-  
-  return $scale;
-};
-
-/**
- * Save a scale object into the database.
- *
- * @param $scale
- *   The scale object. If the sid member is not set, a new scale will be inserted into the DB.
- */
-function gradebookapi_save_scale(&$scale) {
-  $scale->is_new = false;
-
-  if (empty($scale->sid)) {
-    $scale->is_new = true;
-    $scale->sid = db_next_id('{gradebookapi_scale}_sid');
-  }
-
-  $values = array(
-    'sid' => $scale->sid,
-    'name' => $scale->name,
-    'gid' => $scale->gid,
-    'weight' => $scale->weight,
-    'value' => $scale->value,
-  );
-  $types = array(
-    'sid' => '%d',
-    'name' => '%s',
-    'gid' => '%d',
-    'weight' => '%d',
-    'value' => '%s',
-  );
-  
-  if ($scale->is_new) {
-    $query = 'INSERT INTO {gradebookapi_scale} ('. implode(', ', array_keys($types)) .') VALUES ('. implode(', ', $types) .')';
-  }
-  else {
-    $arr = array();
-    foreach ($types as $key => $value) {
-      $arr[] = $key .' = '. $value;
-    }
-    $values[] = $scale->sid;
-    
-    $query = 'UPDATE {gradebookapi_scale} SET '. implode(', ', $arr) .' WHERE sid = %d';
-  }
-  
-  db_query($query, $values);
-};
-
-/**
- * Delete a scale.
- *
- * @param $sid
- *   The sid of the scale
- */
-function gradebookapi_delete_scale($sid) {
-  // TODO: how do we handle data using this scale?
-  db_query('DELETE FROM {gradebookapi_scale} WHERE sid = %d', $sid);
-};
-
-/**
- * Load a category object from the database.
- *
- * @param $param
- *   Either the sid of the category or an array of conditions to match against in the database query
- *
- * @return
- *   A fully-populated category object.
- */
-function gradebookapi_load_category($param = array()) {
-  $arguments = array();
-  if (is_numeric($param)) {
-    $cond = 'cid = %d';
-    $arguments[] = $param;
-  }
-  else {
-    // Turn the conditions into a query.
-    foreach ($param as $key => $value) {
-      $cond[] = db_escape_string($key) ." = '%s'";
-      $arguments[] = $value;
-    }
-    $cond = implode(' AND ', $cond);
-  }
-  
-  $category = db_fetch_object(db_query('SELECT cid, name, gid, sid, weight, value FROM {gradebookapi_category} WHERE '. $cond, $arguments));
-  
-  return $category;
-};
-
-/**
- * Save a category object into the database.
- *
- * @param $category
- *   The category object. If the cid member is not set, a new category will be inserted into the DB.
- */
-function gradebookapi_save_category(&$category) {
-  $category->is_new = false;
-
-  if (empty($category->cid)) {
-    $category->is_new = true;
-    $category->cid = db_next_id('{gradebookapi_category}_cid');
-  }
-
-  $values = array(
-    'cid' => $category->cid,
-    'name' => $category->name,
-    'gid' => $category->gid,
-    'weight' => $category->weight,
-    'value' => $category->value,
-  );
-  $types = array(
-    'cid' => '%d',
-    'name' => '%s',
-    'gid' => '%d',
-    'weight' => '%d',
-    'value' => '%d',
-  );
-  
-  if ($scale->is_new) {
-    $query = 'INSERT INTO {gradebookapi_category} ('. implode(', ', array_keys($types)) .') VALUES ('. implode(', ', $types) .')';
-  }
-  else {
-    $arr = array();
-    foreach ($types as $key => $value) {
-      $arr[] = $key .' = '. $value;
-    }
-    $values[] = $category->cid;
-    
-    $query = 'UPDATE {gradebookapi_category} SET '. implode(', ', $arr) .' WHERE cid = %d';
-  }
-  
-  db_query($query, $values);
-};
-
-/**
- * Delete a category.
- *
- * @param $cid
- *   The cid of the category
- */
-function gradebookapi_delete_category($cid) {
-  // TODO: do we go through all data and set category to 0?
-  // TODO: how do we handle stat calculation?
-  db_query('DELETE FROM {gradebookapi_category} WHERE cid = %d', $cid);
-};
-
-/**
- * Load an assignment object from the database.
- *
- * @param $param
- *   Either the aid of the assignment or an array of conditions to match against in the database query
- *
- * @return
- *   A fully-populated assignment object.
- */
-function gradebookapi_load_assignment($param = array()) {
-  $arguments = array();
-  if (is_numeric($param)) {
-    $cond = 'aid = %d';
-    $arguments[] = $param;
-  }
-  else {
-    // Turn the conditions into a query.
-    foreach ($param as $key => $value) {
-      $cond[] = db_escape_string($key) ." = '%s'";
-      $arguments[] = $value;
-    }
-    $cond = implode(' AND ', $cond);
-  }
-  
-  $assignment = db_fetch_object(db_query('SELECT aid, nid, gid, cid, sid, value, startdate, enddate FROM {gradebookapi_assignment} WHERE '. $cond, $arguments));
-  
-  return $assignment;
-};
-
-/**
- * Save an assignment object into the database.
- *
- * @param $assignment
- *   The assignment object. If the aid member is not set, a new assignment will be inserted into the DB.
- */
-function gradebookapi_save_assignment(&$assignment) {
-  $assignment->is_new = false;
-
-  if (empty($assignment->cid)) {
-    $assignment->is_new = true;
-    $assignment->aid = db_next_id('{gradebookapi_assignment}_aid');
-  }
-
-  $values = array(
-    'aid' => $assignment->aid,
-    'nid' => $assignment->nid,
-    'gid' => $assignment->gid,
-    'cid' => $assignment->cid,
-    'sid' => $assignment->sid,
-    'value' => $assignment->value,
-    'startdate' => $assignment->startdate,
-    'enddate' => $assignment->enddate,
-  );
-  $types = array(
-    'aid' => '%d',
-    'nid' => '%d',
-    'gid' => '%d',
-    'cid' => '%d',
-    'sid' => '%d',
-    'value' => '%d',
-    'startdate' => '%d',
-    'enddate' => '%d',
-  );
-  
-  if ($scale->is_new) {
-    $query = 'INSERT INTO {gradebookapi_assignment} ('. implode(', ', array_keys($types)) .') VALUES ('. implode(', ', $types) .')';
-  }
-  else {
-    $arr = array();
-    foreach ($types as $key => $value) {
-      $arr[] = $key .' = '. $value;
-    }
-    $values[] = $assignment->aid;
-    
-    $query = 'UPDATE {gradebookapi_assignment} SET '. implode(', ', $arr) .' WHERE aid = %d';
-  }
-  
-  db_query($query, $values);
-};
-
-/**
- * Delete a assignment.
- *
- * @param $aid
- *   The aid of the assignment
- */
-function gradebookapi_delete_assignment($aid) {
-  $assignment = gradebookapi_load_assignment($aid);
-
-  db_query('DELETE FROM {gradebookapi_grade} WHERE aid = %d', $aid);
-  db_query('DELETE FROM {gradebookapi_assignment} WHERE aid = %d', $aid);
-  
-  _gradebookapi_clear_cache($assignment->gid);
-};
-
-/**
- * Load a grade object from the database.
- *
- * @param $param
- *   Either the grid of the grade or an array of conditions to match against in the database query
- *
- * @return
- *   A fully-populated grade object.
- */
-function gradebookapi_load_grade($param = array()) {
-  $arguments = array();
-  if (is_numeric($param)) {
-    $cond = 'grid = %d';
-    $arguments[] = $param;
-  }
-  else {
-    // Turn the conditions into a query.
-    foreach ($param as $key => $value) {
-      $cond[] = db_escape_string($key) ." = '%s'";
-      $arguments[] = $value;
-    }
-    $cond = implode(' AND ', $cond);
-  }
-  
-  $grade = db_fetch_object(db_query('SELECT grid, aid, uid, value, timestamp FROM {gradebookapi_grade} WHERE '. $cond, $arguments));
+  // add uid/nid
+  $grade->uid = $uid;
+  $grade->nid = $nid;
   
   return $grade;
-};
+}
 
-/**
- * Save a grade object into the database.
- *
- * @param $assignment
- *   The grade object. If the did member is not set, a new grade will be inserted into the DB.
- */
-function gradebookapi_save_grade(&$grade) {
-  $grade->is_new = false;
-
-  if (empty($grade->grid)) {
-    $grade->is_new = true;
-    $grade->grid = db_next_id('{gradebookapi_grade}_grid');
-  }
-
-  $values = array(
-    'grid' => $grade->grid,
-    'aid' => $grade->aid,
-    'uid' => $grade->uid,
-    'value' => $grade->value,
-    'timestamp' => $grade->timestamp,
-  );
-  $types = array(
-    'grid' => '%d',
-    'aid' => '%d',
-    'uid' => '%d',
-    'value' => '%d',
-    'timestamp' => '%d',
-  );
-  
-  if ($scale->is_new) {
-    $query = 'INSERT INTO {gradebookapi_grade} ('. implode(', ', array_keys($types)) .') VALUES ('. implode(', ', $types) .')';
+function gradebookapi_set_grade($grade) {
+  $old = gradebookapi_get_grade($grade->uid, $grade->nid);
+  $grade->timestamp = time();
+  if ($old->timestamp) {
+    db_query('UPDATE {gradebookapi_grade} SET earned=%d, timestamp=%d WHERE uid=%d AND nid=%d', $grade->earned, $grade->timestamp, $grade->uid, $grade->nid);
   }
   else {
-    $arr = array();
-    foreach ($types as $key => $value) {
-      $arr[] = $key .' = '. $value;
-    }
-    $values[] = $grade->grid;
-    
-    $query = 'UPDATE {gradebookapi_grade} SET '. implode(', ', $arr) .' WHERE grid = %d';
+    db_query("INSERT INTO {gradebookapi_grade} (uid, nid, earned, timestamp) VALUES (%d, %d, %d, %d)", $grade->uid, $grade->nid, $grade->earned, $grade->timestamp); 
   }
   
-  db_query($query, $values);
-};
-
-/**
- * Delete a grade.
- *
- * @param $grid
- *   The grid of the grade
- */
-function gradebookapi_delete_grade($grid) {
-  $grade = gradebookapi_load_grade($grid);
-  $assignment = gradebookapi_load_assignment($grade->aid);
-  
-  db_query('DELETE FROM {gradebookapi_grade} WHERE grid = %d', $grid);
-  _gradebookapi_clear_cache($assignment->gid);
-};
-
-/**
- * Load a totals object from the database.
- *
- * @param $param
- *   An array of conditions to match against in the database query
- *
- * @return
- *   A fully-populated totals object.
- */
-function gradebookapi_load_totals($param = array()) {
-};
-
-/**
- * Implementation of hook_elements()
- * Allows for creation of custom elements (scale element, etc) for the Form API
- */
-/*
-function gradebookapi_elements() {
-};
-*/
-
-/*
-function hook_gradebook_assignment() {
-};
-*/
-
-/**
- * Clear a gradebook stat cache.
- *
- * @param $gid
- *   The gid of the gradebook
- */
-function _gradebookapi_clear_cache($gid, $cid = 0, $aid = 0, $uid = 0) {
-
-function _gradebookapi_cache_stats($gid) {
+  $terms = taxonomy_node_get_terms_by_vocabulary($grade->nid, gradebookapi_get_vid());
+  foreach ($terms as $term) {
+    gradebookapi_calc_grades($grade->uid, $term->tid);
+  }
 }
-  db_query('DELETE FROM {gradebookapi_cache} WHERE gid = %d', $gid);
+
+function gradebookapi_rebuild_grades($tid) {
+  $children = taxonomy_get_children($tid, gradebookapi_get_vid());
+  if ($children) {
+    foreach ($children as $child) {
+      gradebookapi_rebuild_grades($child->tid);
+    }
+  }
+  else {
+    gradebookapi_calc_grades_all_users($tid);
+  }
+}
+
+function gradebookapi_clear_term_grades($tid, $recursive=TRUE, $start=TRUE) {
+  db_query("DELETE FROM {gradebookapi_cache} WHERE tid=%d", $tid);
+  // do a recursive delete?
+  if ($recursive) {
+    $children = taxonomy_get_children($tid, _gradebook_get_vid());
+    foreach ($children as $child) {
+      gradebookapi_clear_term_grades($child->tid, $recursive, FALSE);
+    }
+  }
+  // tell parents to recalc cache
+  if ($start) {
+    $parents = taxonomy_get_parents($tid);
+    foreach ($parents as $parent) {
+      gradebookapi_calc_grades_all_users($parent->tid);
+    }
+  }
+}
+
+function gradebookapi_calc_grades($uid, $tid, $recursive=TRUE) {
+  $earned = 0;
+  $possible = 0;
+  
+  //watchdog('gradebook', "_gradebook_calc_grades($uid, $tid, $recursive)");
+  //print_r(debug_backtrace());
+  
+  // if UID is < 1, calc grades for ALL users
+  if ($uid<=0) {
+    return gradebookapi_calc_grades_all_users($tid);
+  }
+  
+  // clear cache
+  db_query("DELETE FROM {gradebookapi_cache} WHERE tid=%d AND uid=%d", $tid, $uid); 
+  
+  // get grades from child terms
+  $children = taxonomy_get_children($tid, gradebookapi_get_vid());
+  foreach ($children as $child) {
+    $grade = gradebookapi_get_term_grade($uid, $child->tid);
+    if ($grade) {
+      $earned += $grade->earned;
+      $possible += $grade->possible;
+    }
+  }
+  
+  // get grades from nodes at this term
+  $result = taxonomy_select_nodes(array($tid), 'or', 0, FALSE);
+  while ($node = db_fetch_object($result)) {
+    $grade = gradebookapi_get_grade($uid, $node->nid);
+    if ($grade) {
+      $earned += $grade->earned;
+      $possible += $grade->possible;
+    }
+  }
+  
+  // cache grade
+  db_query("INSERT INTO {gradebookapi_cache} (uid, tid, earned, possible) VALUES (%d, %d, %d, %d)", $uid, $tid, $earned, $possible);
+  
+  if ($recursive) {
+    // recalc parents
+    $parents = taxonomy_get_parents($tid);
+    foreach ($parents as $parent) {
+      gradebookapi_calc_grades($uid, $parent->tid, $recursive);
+    }
+  }
+}
+
+function gradebookapi_calc_grades_all_users($tid, $recursive=TRUE) {
+  // TODO: fix reference to _gradebook_student_roles()
+  $str_rids = implode(',', array_keys(_gradebook_student_roles()));
+  $result = db_query("SELECT u.uid, u.name FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status != 0 AND r.rid IN (". $str_rids .") ORDER BY u.name ASC");
+  while ($account = db_fetch_object($result)) {
+    gradebookapi_calc_grades($account->uid, $tid, $recursive);
+  }
+}
+
+function gradebookapi_get_term_grade($uid, $tid) {
+  $result = db_query("SELECT earned, possible FROM {gradebookapi_cache} WHERE tid=%d AND uid=%d", $tid, $uid);
+  $grade = db_fetch_object($result);
+  return $grade;
+}
+
+// hook_nodeapi
+function gradebookapi_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+  switch ($op) {
+    // TODO: handle assignment deletions, etc
+  }
+}
+
+// hook_taxonomy
+function gradebookapi_taxonomy($op, $type, $obj = NULL) {
+  if ($obj['vid'] == gradebookapi_get_vid()) {
+    switch ($op) {
+      case 'insert':
+      case 'update':
+        switch ($type) {
+          case 'term':
+            // update grade cache
+            //if ($obj['parent_old'] && ($obj['parent_old'] != $obj['parent'])) {
+              // update old parent, but exclude 'tid' as hierarchy is not updated yet
+              //gradebookapi_calc_grades_all_users($obj['parent_old'], array('tid'=>array($obj['tid'])));
+            //}
+            //gradebookapi_calc_grades_all_users($obj['tid']);
+            
+            // at this point, the term has been saved, but the hierarchy table has not been updated
+            // delete the term grades from cache and force cleaning up OLD tree branch
+            //gradebookapi_clear_term_grades($obj['tid']);
+            // update new parent, forcing inclusion of 'tid'
+            //gradebookapi_calc_grades_all_users($obj['tid'], array('parents'=>arra($obj['parent'])), array('parents'=>array($obj['parent_old'])));
+            
+            // recalc old parent, excluding current 'tid'
+            //if ($obj['parent_old']) {
+            //  gradebookapi_calc_grades_all_users($obj['parent_old'], array('children'=>array($obj['tid'])));
+            //}
+            // recalc new parent, including current 'tid' and excluding old parent
+            //gradebookapi_calc_grades_all_users($obj['parent'][0], array('parents'=>array($obj['parent_old'])), array('children'=>array($obj['tid'])));
+            break;
+        }
+        break;
+      case 'delete':
+        switch ($type) {
+          case 'term':
+            // TODO: by the time we get here, the hierarchy has already been cleaned.
+            //       how do we tell the parent to recalc?
+            gradebookapi_clear_term_grades($obj['tid']);
+            // TODO: delete nodes associated with this term and it's children
+            break;
+          case 'vocabulary':
+            variable_del('gradebookapi_nav_vocabulary');
+            variable_del('gradebookapi_default_tid');
+            break;
+        }
+        break;
+    }
+  }
+}
+
+function gradebookapi_assignment_load($node) {
+  $additions = db_fetch_object(db_query('SELECT possible, overage FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid));
+  return $additions;
+} 
+
+function gradebookapi_assignment_insert($node) {
+  db_query("INSERT INTO {gradebookapi_assignment} (nid, possible, overage) VALUES (%d, %d, %d)", $node->nid, $node->possible, $node->overage);
+  
+  // we have to manually update terms as we can't control module order
+  taxonomy_node_save($node->nid, $node->taxonomy);
+  
+  $terms = taxonomy_node_get_terms_by_vocabulary($node->nid, gradebookapi_get_vid());
+  foreach ($terms as $term) {
+    gradebookapi_calc_grades_all_users($term->tid);
+  }
+}
+
+function gradebookapi_assignment_update($node) {
+  db_query("UPDATE {gradebookapi_assignment} SET possible = '%s', overage = %d WHERE nid = %d", $node->possible, $node->overage, $node->nid);
+  
+  // we have to manually update terms as we can't control module order
+  taxonomy_node_save($node->nid, $node->taxonomy);
+  
+  $terms = taxonomy_node_get_terms_by_vocabulary($node->nid, gradebookapi_get_vid());
+  foreach ($terms as $term) {
+    gradebookapi_calc_grades_all_users($term->tid);
+  }
+}
+
+function gradebookapi_assignment_delete($node) {
+  db_query('DELETE FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid);
+  db_query('DELETE FROM {gradebookapi_grade} WHERE nid = %d', $node->nid);
+
+  $terms = taxonomy_node_get_terms_by_vocabulary($node->nid, gradebookapi_get_vid());
+  foreach ($terms as $term) {
+    gradebookapi_calc_grades_all_users($term->tid);
+  }
+}
+
+function gradebookapi_assignment_form_elements($node) {
+  $form = array();
+  
+  $form['possible'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Possible'),
+    '#default_value' => ($node->possible?$node->possible:'0'),
+    '#size' => 10,
+    '#maxlength' => 10,
+    '#required' => TRUE,
+  );
+  
+  $form['overage'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Overage'),
+    '#default_value' => ($node->overage?$node->overage:'0'),
+  );
+  
+  return $form;
+}
+
+function gradebookapi_assignment_validate(&$node) {
+  if (!is_numeric($node->possible) || ($node->possible < 0)) {
+    form_set_error('possible', t('The possible value for the assignment must be a positive integer.')); 
+  }
+}
+
+function gradebookapi_assignment_submit(&$node) {
+  // TODO: anything to do here?
 }
