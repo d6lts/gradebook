@@ -31,106 +31,109 @@ function gradebook_menu($may_cache) {
       'callback' => 'gradebook_page',
     );
   }
-  elseif (is_numeric(arg(1)) || (variable_get('gradebook_show_default', 1))) {
-    $gradebook = (is_numeric(arg(1))?gradebookapi_gradebook_load(arg(1)):gradebookapi_default_gradebook_load());
-    if (is_numeric(arg(1))) {
+  else {
+    theme_add_style(drupal_get_path('module', 'gradebook') .'/gradebook.css');
+    if (is_numeric(arg(1)) || (variable_get('gradebook_show_default', 1))) {
+      $gradebook = (is_numeric(arg(1))?gradebookapi_gradebook_load(arg(1)):gradebookapi_default_gradebook_load());
+      if (is_numeric(arg(1))) {
+        $items[] = array(
+          'path'               => _gradebook_base_url(),
+          'title'              => t('view'),
+          'type'               => MENU_CALLBACK,
+          'callback'           => 'gradebook_gradebook_page',
+          'callback arguments' => array($gradebook),
+        );
+      }
       $items[] = array(
-        'path'               => _gradebook_base_url(),
+        'path'               => _gradebook_base_url().'/view',
         'title'              => t('view'),
-        'type'               => MENU_CALLBACK,
-        'callback'           => 'gradebook_gradebook_page',
-        'callback arguments' => array($gradebook),
+        'type'               => MENU_DEFAULT_LOCAL_TASK,
+        'weight'             => -10,
       );
-    }
-    $items[] = array(
-      'path'               => _gradebook_base_url().'/view',
-      'title'              => t('view'),
-      'type'               => MENU_DEFAULT_LOCAL_TASK,
-      'weight'             => -10,
-    );
-    $items[] = array(
-      'path'               => _gradebook_base_url().'/rebuild',
-      'title'              => t('rebuild'),
-      'access'             => user_access('edit gradebook'),
-      'callback'           => 'gradebook_rebuild_page',
-      'callback arguments' => array($gradebook),
-      'type'               => MENU_LOCAL_TASK,
-    );
-    $items[] = array(
-      'path'               => _gradebook_base_url().'/category',
-      'title'              => t('categories'),
-      'access'             => user_access('edit gradebook'),
-      'callback'           => 'gradebook_category_page',
-      'callback arguments' => array($gradebook),
-      'type'               => MENU_LOCAL_TASK,
-    );
-    $items[] = array(
-      'path'               => _gradebook_base_url().'/category/list',
-      'title'              => t('list'),
-      'type'               => MENU_DEFAULT_LOCAL_TASK,
-      'weight'             => -10,
-    );
-    $items[] = array(
-      'path'               => _gradebook_base_url().'/category/add',
-      'title'              => t('add category'),
-      'access'             => user_access('edit gradebook'),
-      'callback'           => 'gradebook_category_form',
-      'callback arguments' => array($gradebook),
-      'type'               => MENU_LOCAL_TASK,
-    );
-    
-    if (is_numeric(arg(1))) {
-      if ((arg(2)=='category') && (arg(3)=='edit') && is_numeric(arg(4))) {
-        $tid = arg(4);
-        $term = taxonomy_get_term($tid);
-        $items[] = array(
-          'path' => _gradebook_base_url().'/category/edit',
-          'title' => t('edit category'),
-          'callback' => 'gradebook_category_form',
-          'callback arguments' => array($gradebook, (array)$term),
-          'access' => user_access('edit gradebook'),
-          'type' => MENU_CALLBACK,
-        );
+      $items[] = array(
+        'path'               => _gradebook_base_url().'/rebuild',
+        'title'              => t('rebuild'),
+        'access'             => user_access('edit gradebook'),
+        'callback'           => 'gradebook_rebuild_page',
+        'callback arguments' => array($gradebook),
+        'type'               => MENU_LOCAL_TASK,
+      );
+      $items[] = array(
+        'path'               => _gradebook_base_url().'/category',
+        'title'              => t('categories'),
+        'access'             => user_access('edit gradebook'),
+        'callback'           => 'gradebook_category_page',
+        'callback arguments' => array($gradebook),
+        'type'               => MENU_LOCAL_TASK,
+      );
+      $items[] = array(
+        'path'               => _gradebook_base_url().'/category/list',
+        'title'              => t('list'),
+        'type'               => MENU_DEFAULT_LOCAL_TASK,
+        'weight'             => -10,
+      );
+      $items[] = array(
+        'path'               => _gradebook_base_url().'/category/add',
+        'title'              => t('add category'),
+        'access'             => user_access('edit gradebook'),
+        'callback'           => 'gradebook_category_form',
+        'callback arguments' => array($gradebook),
+        'type'               => MENU_LOCAL_TASK,
+      );
+      
+      if (is_numeric(arg(1))) {
+        if ((arg(2)=='category') && (arg(3)=='edit') && is_numeric(arg(4))) {
+          $tid = arg(4);
+          $term = taxonomy_get_term($tid);
+          $items[] = array(
+            'path' => _gradebook_base_url().'/category/edit',
+            'title' => t('edit category'),
+            'callback' => 'gradebook_category_form',
+            'callback arguments' => array($gradebook, (array)$term),
+            'access' => user_access('edit gradebook'),
+            'type' => MENU_CALLBACK,
+          );
+        }
+        if ((arg(2)=='grade') && is_numeric(arg(3)) && is_numeric(arg(4))) {
+          $uid = arg(3);
+          $nid = arg(4);
+          $grade = gradebookapi_get_grade($uid, $nid);
+          $items[] = array(
+            'path' => _gradebook_base_url().'/grade',
+            'title' => t('edit grade'),
+            'callback' => 'gradebook_grade_form',
+            'callback arguments' => array($gradebook, (array)$grade),
+            'access' => user_access('edit gradebook'),
+            'type' => MENU_CALLBACK,
+          );
+        }
       }
-      if ((arg(2)=='grade') && is_numeric(arg(3)) && is_numeric(arg(4))) {
-        $uid = arg(3);
-        $nid = arg(4);
-        $grade = gradebookapi_get_grade($uid, $nid);
-        $items[] = array(
-          'path' => _gradebook_base_url().'/grade',
-          'title' => t('edit grade'),
-          'callback' => 'gradebook_grade_form',
-          'callback arguments' => array($gradebook, (array)$grade),
-          'access' => user_access('edit gradebook'),
-          'type' => MENU_CALLBACK,
-        );
-      }
-    }
-    elseif (variable_get('gradebook_show_default', 1)) {
-      if ((arg(1)=='category') && (arg(2)=='edit') && is_numeric(arg(3))) {
-        $tid = arg(3);
-        $term = taxonomy_get_term($tid);
-        $items[] = array(
-          'path' => _gradebook_base_url().'/category/edit',
-          'title' => t('edit category'),
-          'callback' => 'gradebook_category_form',
-          'callback arguments' => array($gradebook, (array)$term),
-          'access' => user_access('edit gradebook'),
-          'type' => MENU_CALLBACK,
-        );
-      }
-      if ((arg(1)=='grade') && is_numeric(arg(2)) && is_numeric(arg(3))) {
-        $uid = arg(2);
-        $nid = arg(3);
-        $grade = gradebookapi_get_grade($uid, $nid);
-        $items[] = array(
-          'path' => _gradebook_base_url().'/grade',
-          'title' => t('edit grade'),
-          'callback' => 'gradebook_grade_form',
-          'callback arguments' => array($gradebook, (array)$grade),
-          'access' => user_access('edit gradebook'),
-          'type' => MENU_CALLBACK,
-        );
+      elseif (variable_get('gradebook_show_default', 1)) {
+        if ((arg(1)=='category') && (arg(2)=='edit') && is_numeric(arg(3))) {
+          $tid = arg(3);
+          $term = taxonomy_get_term($tid);
+          $items[] = array(
+            'path' => _gradebook_base_url().'/category/edit',
+            'title' => t('edit category'),
+            'callback' => 'gradebook_category_form',
+            'callback arguments' => array($gradebook, (array)$term),
+            'access' => user_access('edit gradebook'),
+            'type' => MENU_CALLBACK,
+          );
+        }
+        if ((arg(1)=='grade') && is_numeric(arg(2)) && is_numeric(arg(3))) {
+          $uid = arg(2);
+          $nid = arg(3);
+          $grade = gradebookapi_get_grade($uid, $nid);
+          $items[] = array(
+            'path' => _gradebook_base_url().'/grade',
+            'title' => t('edit grade'),
+            'callback' => 'gradebook_grade_form',
+            'callback arguments' => array($gradebook, (array)$grade),
+            'access' => user_access('edit gradebook'),
+            'type' => MENU_CALLBACK,
+          );
+        }
       }
     }
   }
@@ -241,8 +244,8 @@ function gradebook_gradebook_page($gradebook) {
 
   // gradebookapi_select_nodes($gradebook, $tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC')
   $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'n.created ASC');
-  while ($node = db_fetch_object($result)) {
-    $assignments[$node->nid] = node_load($node->nid);
+  while ($assignment = db_fetch_object($result)) {
+    $assignments[$assignment->nid] = node_load($assignment->nid);
   }
 
   if (user_access('view gradebook')) {
@@ -264,6 +267,175 @@ function gradebook_gradebook_page($gradebook) {
 }
 
 function theme_gradebook_page($gradebook, $assignments, $student_grades) {
+  $headers = array();
+  $rows = array();
+  
+  $vid = gradebookapi_get_vid();
+  $categories = taxonomy_get_children($gradebook->tid, $vid);
+  $category_tids = array();
+  $assignments_sorted = array('root'=>array());
+  
+  $found = FALSE;
+  
+  // collect tids from categories
+  foreach ($categories as $category) {
+    $tree = taxonomy_get_tree(gradebookapi_get_vid(), $category->tid);
+    $category_tids[$category->tid][] = $category->tid;
+    $category_tids[$category->tid] = array_merge($category_tids[$category->tid], array_map('_taxonomy_get_tid_from_term', $tree));
+  }
+  
+  // sort assignments
+  foreach ($assignments as $assignment) {
+    $found = FALSE;
+    $terms = taxonomy_node_get_terms($assignment->nid);
+    foreach ($terms as $term) {
+      // make sure we only look in the gradebook vocabulary
+      if ($term->vid == $vid) {
+        // search category tids
+        foreach ($category_tids as $categorytid => $tids) {
+          if (in_array($term->tid, $tids)) {
+            $assignments_sorted[$categorytid][$assignment->nid] = $assignment;
+            $found = TRUE;
+          }
+        }
+      }
+    }
+    // assignment is not in a category
+    if (!$found) {
+      $assignments_sorted['root'][$assignment->nid] = $assignment;
+    }
+  }
+  
+  $header1 = array();
+  $header2 = array();
+  $header1[] = array('data'=>'', 'class'=>'category'); // student name
+  $header2[] = array('data'=>'', 'class'=>'assignment'); // student name
+  foreach ($categories as $category) {
+    if (count($assignments_sorted[$category->tid])) {
+      $header1[] = array('data'=>$category->name, 'colspan'=>count($assignments_sorted[$category->tid]), 'class'=>'category');
+      foreach ($assignments_sorted[$category->tid] as $assignment) {
+        $header2[] = l($assignment->title, 'node/'.$assignment->nid) . '<br />' . $assignment->possible;
+      }
+    }
+  }
+  if (count($assignments_sorted['root'])) {
+    $header1[] = array('data'=>'', 'colspan'=>count($assignments_sorted['root']), 'class'=>'assignment');
+    foreach ($assignments_sorted['root'] as $assignment) {
+      $header2[] = l($assignment->title, 'node/'.$assignment->nid) . '<br />' . $assignment->possible;
+    }
+  }
+  $header1[] = array('data'=>'', 'class'=>'category'); // total grade
+  $header2[] = array('data'=>'', 'class'=>'assignment'); // total grade
+  $headers[] = $header1;
+  $headers[] = $header2;
+  
+  foreach ($student_grades as $uid => $grades) {
+    $row = array();
+    
+    $account = user_load(array('uid'=>$uid));
+    $row[] = theme('username', $account);
+    
+    foreach ($categories as $category) {
+      if (count($assignments_sorted[$category->tid])) {
+        foreach ($assignments_sorted[$category->tid] as $assignment) {
+          $grade = $grades[$assignment->nid];
+          if (user_access('edit gradebook')) {
+            $row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
+          }
+          else {
+            $row[] = ($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--'));
+          }
+        }
+      }
+    }
+    if (count($assignments_sorted['root'])) {
+      foreach ($assignments_sorted['root'] as $assignment) {
+        $grade = $grades[$assignment->nid];
+        if (user_access('edit gradebook')) {
+          $row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
+        }
+        else {
+          $row[] = ($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--'));
+        }
+      }
+    }
+
+    $grade = gradebookapi_get_term_grade($account->uid, $gradebook->tid);
+    $row[] = $grade->earned . '/' . $grade->possible;
+    $rows[] = $row;
+  }
+
+  return theme('gradebook_table', $headers, $rows, array('class'=>'gradebook'));
+}
+
+function theme_gradebook_table($headers, $rows, $attributes = array(), $caption = NULL) {
+  $output = '<table'. drupal_attributes($attributes) .">\n";
+
+  if (isset($caption)) {
+    $output .= '<caption>'. $caption ."</caption>\n";
+  }
+
+  // Format the table header:
+  if (count($headers)) {
+    $output .= ' <thead>';
+    foreach ($headers as $header) {
+      $ts = tablesort_init($header);
+      $output .= '  <tr>';
+      foreach ($header as $cell) {
+        $cell = tablesort_header($cell, $header, $ts);
+        $output .= _theme_table_cell($cell, 1);
+      }
+      $output .= '  </tr>';
+    }
+    $output .= " </thead>\n";
+  }
+
+  // Format the table rows:
+  $output .= "<tbody>\n";
+  if (count($rows)) {
+    foreach ($rows as $number => $row) {
+      $attributes = array();
+
+      // Check if we're dealing with a simple or complex row
+      if (isset($row['data'])) {
+        foreach ($row as $key => $value) {
+          if ($key == 'data') {
+            $cells = $value;
+          }
+          else {
+            $attributes[$key] = $value;
+          }
+        }
+      }
+      else {
+        $cells = $row;
+      }
+
+      // Add odd/even class
+      $class = ($number % 2 == 1) ? 'even': 'odd';
+      if (isset($attributes['class'])) {
+        $attributes['class'] .= ' '. $class;
+      }
+      else {
+        $attributes['class'] = $class;
+      }
+
+      // Build row
+      $output .= ' <tr'. drupal_attributes($attributes) .'>';
+      $i = 0;
+      foreach ($cells as $cell) {
+        $cell = tablesort_cell($cell, $header, $ts, $i++);
+        $output .= _theme_table_cell($cell, 0);
+      }
+      $output .= " </tr>\n";
+    }
+  }
+
+  $output .= "</tbody></table>\n";
+  return $output;
+}
+
+function theme_gradebook_page_old($gradebook, $assignments, $student_grades) {
   $header = array();
   $rows = array();
   
