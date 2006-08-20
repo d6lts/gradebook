@@ -101,9 +101,9 @@ function gradebook_menu($may_cache) {
           $items[] = array(
             'path' => _gradebook_base_url().'/grade',
             'title' => t('edit grade'),
-            'callback' => 'gradebook_grade_form',
+            'callback' => (user_access('edit gradebook')?'gradebook_grade_form':'gradebook_grade_view'),
             'callback arguments' => array($gradebook, (array)$grade),
-            'access' => user_access('edit gradebook'),
+            'access' => user_access('edit gradebook') || $grade->note,
             'type' => MENU_CALLBACK,
           );
         }
@@ -128,9 +128,9 @@ function gradebook_menu($may_cache) {
           $items[] = array(
             'path' => _gradebook_base_url().'/grade',
             'title' => t('edit grade'),
-            'callback' => 'gradebook_grade_form',
+            'callback' => (user_access('edit gradebook')?'gradebook_grade_form':'gradebook_grade_view'),
             'callback arguments' => array($gradebook, (array)$grade),
-            'access' => user_access('edit gradebook'),
+            'access' => user_access('edit gradebook') || $grade->note,
             'type' => MENU_CALLBACK,
           );
         }
@@ -239,6 +239,7 @@ function gradebook_list() {
 }
 
 function gradebook_gradebook_page($gradebook) {
+  global $user;
   $assignments = array();
   $student_grades = array();
 
@@ -314,14 +315,14 @@ function theme_gradebook_page($gradebook, $assignments, $student_grades) {
     if (count($assignments_sorted[$category->tid])) {
       $header1[] = array('data'=>$category->name, 'colspan'=>count($assignments_sorted[$category->tid]), 'class'=>'category');
       foreach ($assignments_sorted[$category->tid] as $assignment) {
-        $header2[] = l($assignment->title, 'node/'.$assignment->nid) . '<br />' . $assignment->possible;
+        $header2[] = l($assignment->title, 'node/'.$assignment->nid) . '<br />' . $assignment->gradebookapi['possible'];
       }
     }
   }
   if (count($assignments_sorted['root'])) {
     $header1[] = array('data'=>'', 'colspan'=>count($assignments_sorted['root']), 'class'=>'assignment');
     foreach ($assignments_sorted['root'] as $assignment) {
-      $header2[] = l($assignment->title, 'node/'.$assignment->nid) . '<br />' . $assignment->possible;
+      $header2[] = l($assignment->title, 'node/'.$assignment->nid) . '<br />' . $assignment->gradebookapi['possible'];
     }
   }
   $header1[] = array('data'=>'', 'class'=>'category'); // total grade
@@ -339,33 +340,95 @@ function theme_gradebook_page($gradebook, $assignments, $student_grades) {
       if (count($assignments_sorted[$category->tid])) {
         foreach ($assignments_sorted[$category->tid] as $assignment) {
           $grade = $grades[$assignment->nid];
+          /*
           if (user_access('edit gradebook')) {
-            $row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
+            //$row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
+            $row[] = array(
+              'data' => l(theme_gradebook_grade($grade), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid),
+              'class' => ($grade->exempt?'exempt':'')
+            );
           }
           else {
-            $row[] = ($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--'));
+            //$row[] = ($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--'));
+            $row[] = array(
+              'data' => theme_gradebook_grade($grade),
+              'class' => ($grade->exempt?'exempt':'')
+            );
           }
+          */
+          $row[] = theme_gradebook_assignment_grade($grade);
         }
       }
     }
     if (count($assignments_sorted['root'])) {
       foreach ($assignments_sorted['root'] as $assignment) {
         $grade = $grades[$assignment->nid];
+        /*
         if (user_access('edit gradebook')) {
-          $row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
+          //$row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
+          $row[] = array(
+            'data' => l(theme_gradebook_grade($grade), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid),
+            'class' => ($grade->exempt?'exempt':'')
+          );
         }
         else {
-          $row[] = ($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--'));
+          $row[] = array(
+            'data' => theme_gradebook_grade($grade),
+            'class' => ($grade->exempt?'exempt':'')
+          );
         }
+        */
+        $row[] = theme_gradebook_assignment_grade($grade);
       }
     }
 
     $grade = gradebookapi_get_term_grade($account->uid, $gradebook->tid);
-    $row[] = $grade->earned . '/' . $grade->possible;
+    $row[] = theme_gradebook_term_grade($grade);
     $rows[] = $row;
   }
 
   return theme('gradebook_table', $headers, $rows, array('class'=>'gradebook'));
+}
+
+function theme_gradebook_assignment_grade($grade) {
+  if (isset($grade->earned)) {
+    $results = gradebookapi_invoke_gradebookapi('view', 'grade', $grade);
+    if (count($results)) {
+      $text = array_pop($results);
+    }
+    else {
+      $text = $grade->earned;
+    }
+  }
+  else {
+    $text = variable_get('gradebook_empty_grade', '--');
+  }
+  
+  $ret = array();
+  if (user_access('edit gradebook') || $grade->note) {
+    $ret['data'] = l($text, _gradebook_base_url().'/grade/'.$grade->uid.'/'.$grade->nid);
+  }
+  else {
+    $ret['data'] = $text;
+  }
+  $ret['class'] = ($grade->exempt?'exempt':'');
+  
+  return $ret;
+}
+
+function theme_gradebook_term_grade($grade) {
+  if (isset($grade->earned)) {
+    $results = gradebookapi_invoke_gradebookapi('view', 'grade', $grade);
+    if (count($results)) {
+      return array_pop($results);
+    }
+    else {
+      return $grade->earned . '/' . $grade->possible;
+    }
+  }
+  else {
+    return variable_get('gradebook_empty_grade', '--');
+  }
 }
 
 function theme_gradebook_table($headers, $rows, $attributes = array(), $caption = NULL) {
@@ -445,7 +508,7 @@ function theme_gradebook_page_old($gradebook, $assignments, $student_grades) {
   
   $header[] = ''; // student name
   foreach ($assignments as $assignment) {
-    $header[] = l($assignment->title, 'node/'.$assignment->nid) . '<br />' . $assignment->possible;
+    $header[] = l($assignment->title, 'node/'.$assignment->nid) . '<br />' . $assignment->gradebookapi['possible'];
   }
   $header[] = ''; // total grade
   
@@ -581,6 +644,40 @@ function gradebook_category_form_submit($form_id, $form_values) {
   return _gradebook_base_url().'/category'; 
 }
 
+function gradebook_grade_view($gradebook, $grade) {
+  $grade = (object)$grade;
+  $account = user_load(array('uid' => $grade->uid));
+  $node = node_load($grade->nid);
+
+  // TODO: cleanup grade view rendering
+  //       ideally edit is in-place in gradebook using AJAX
+  $form['user'] = array(
+    '#value' => 'Student: ' . $account->name . "<br />\n",
+  );
+  
+  $form['node'] = array(
+    '#value' => 'Assignment: ' . $node->title . "<br />\n",
+  );
+  
+  $form['possible'] = array(
+    '#value' => 'Possible: ' . $node->possible . "<br />\n",
+  );
+  
+  $form['earned'] = array(
+    '#value' => 'Earned: ' . $grade->earned . "<br />\n",
+  );
+  
+  $form['exempt'] = array(
+    '#value' => 'Exempt: ' . $grade->exempt . "<br />\n",
+  );
+  
+  $form['note'] = array(
+    '#value' => 'Note: ' . $grade->note . "<br />\n",
+  );
+  
+  return drupal_get_form('gradebook_grade_view', $form);
+}
+
 function gradebook_grade_form($gradebook, $edit = array()) {
   $account = user_load(array('uid' => $edit['uid']));
   $node = node_load($edit['nid']);
@@ -598,10 +695,6 @@ function gradebook_grade_form($gradebook, $edit = array()) {
   $form['possible'] = array(
     '#value' => 'Possible: ' . $node->possible . "<br />\n",
   );
-
-  $form['overage'] = array(
-    '#value' => 'Overage: ' . ($node->overage?'Yes':'No') . "<br />\n",
-  );
   
   $form['earned'] = array(
     '#title' => t('Earned'),
@@ -610,6 +703,18 @@ function gradebook_grade_form($gradebook, $edit = array()) {
     '#maxlength' =>  64,
     '#description' => t('The grade earned.'),
     '#required' => TRUE
+  );
+  
+  $form['exempt'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Exempt student from this assignment'),
+    '#default_value' => $edit['exempt'],
+  );
+  
+  $form['note'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Note to student'),
+    '#default_value' => $edit['note'],
   );
 
   $form['uid'] = array(
@@ -633,19 +738,29 @@ function gradebook_grade_form_validate($form_id, $form_values) {
   $node = node_load($form_values['nid']);
   
   if (!$account || !$node) {
-    form_set_error('', t('The UID/NID has an error.'));
+    form_error($form, t('The UID/NID has an error.'));
   }
-
-  if (!$node->overage) {
-    if ($form_values['earned'] > $node->possible) {
-      form_set_error('earned', t('You can not enter a value over the possible value for this assignment.'));
-    }
+  
+  if (is_numeric($form_values['earned']) ? intval($form_values['earned']) != $form_values['earned'] : TRUE) {
+    form_error($form, t('The earned value for the assignment must be an integer.'));
   }
+  
+  $grade = (object)$form_values;
+  $grade->possible = $node->possible;
+  gradebookapi_invoke_gradebookapi('validate', 'grade', $grade);
 }
 
 function gradebook_grade_form_submit($form_id, $form_values) {
-  gradebookapi_set_grade((object)$form_values);
+  $account = user_load(array('uid' => $form_values['uid']));
+  $node = node_load($form_values['nid']);
+  
+  $grade = (object)$form_values;
+  $grade->possible = $node->possible;
+  gradebookapi_invoke_gradebookapi('submit', 'grade', $grade);
+  
+  gradebookapi_set_grade($grade);
   drupal_set_message(t('Saved %type.', array('%type' => t('grade'))));
+  
   return _gradebook_base_url(); 
 }
 

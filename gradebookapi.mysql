@@ -4,7 +4,6 @@
 CREATE TABLE gradebookapi_assignment (
   nid int(10) unsigned NOT NULL,
   possible int(10) NOT NULL default '0',
-  overage int(2) NOT NULL default '0',
   PRIMARY KEY  (nid)
 );
 
@@ -12,7 +11,9 @@ CREATE TABLE gradebookapi_grade (
   uid int(10) unsigned NOT NULL,
   nid int(10) unsigned NOT NULL,
   earned int(10) NOT NULL default '0',
+  exempt int(2) NOT NULL default '0',
   timestamp int(11) NOT NULL default '0',
+  note longtext NOT NULL default '',
   PRIMARY KEY  (uid, nid)
 );
 
