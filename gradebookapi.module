@@ -60,7 +60,7 @@ function gradebookapi_admin_settings_submit($form_id, $form_values) {
   $vocabulary = (array)taxonomy_get_vocabulary($vid);
   
   $vocabulary['nodes'] = array_filter($form_values['nodes']);
-  taxonomy_save_vocabulary(&$vocabulary);
+  taxonomy_save_vocabulary($vocabulary);
   
   // rebuild grades in each gradebook
   //$terms = taxonomy_get_tree($vid, 0, -1, 1);
