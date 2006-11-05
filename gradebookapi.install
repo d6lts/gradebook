@@ -1,0 +1,56 @@
+<?php
+// $Id$
+
+function gradebookapi_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      // the {tablename} syntax is so multisite installs can add a
+      // prefix to the table name as set in the settings.php file
+      db_query("CREATE TABLE {gradebookapi_assignment} (
+        nid int(10) unsigned NOT NULL,
+        possible int(10) NOT NULL default '0',
+        PRIMARY KEY  (nid)
+        )");
+      db_query("CREATE TABLE {gradebookapi_grade} (
+        uid int(10) unsigned NOT NULL,
+        nid int(10) unsigned NOT NULL,
+        earned int(10) NOT NULL default '0',
+        exempt int(2) NOT NULL default '0',
+        timestamp int(11) NOT NULL default '0',
+        note longtext NOT NULL default '',
+        PRIMARY KEY  (uid, nid)
+        )");
+      db_query("CREATE TABLE {gradebookapi_cache} (
+        uid int(10) unsigned NOT NULL,
+        tid int(10) unsigned NOT NULL,
+        earned int(10) NOT NULL default '0',
+        possible int(10) NOT NULL default '0',
+        PRIMARY KEY  (uid, tid)
+        )");
+      break;
+    case 'pgsql':
+      db_query("CREATE TABLE \"gradebookapi_assignment\" (
+        \"nid\" int(10) unsigned NOT NULL default '0',
+        \"possible\" int(10) NOT NULL default '0',
+        PRIMARY KEY  (\"nid\")
+        )");
+      db_query("CREATE TABLE \"gradebookapi_grade\" (
+        \"uid\" int(10) unsigned NOT NULL default '0',
+        \"nid\" int(10) unsigned NOT NULL default '0',
+        \"earned\" int(10) NOT NULL default '0',
+        \"exempt\" int(2) NOT NULL default '0',
+        \"timestamp\" int(11) NOT NULL default '0',
+        \"note\" longtext NOT NULL,
+        PRIMARY KEY  (\"uid\",\"nid\")
+        )");
+      db_query("CREATE TABLE \"gradebookapi_cache\" (
+        \"uid\" int(10) unsigned NOT NULL default '0',
+        \"tid\" int(10) unsigned NOT NULL default '0',
+        \"earned\" int(10) NOT NULL default '0',
+        \"possible\" int(10) NOT NULL default '0',
+        PRIMARY KEY  (\"uid\",\"tid\")
+        )");
+      break;
+  }
+}
