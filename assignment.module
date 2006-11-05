@@ -98,7 +98,7 @@ function assignment_validate(&$node) {
 }
 
 function assignment_submit(&$node) {
-  gradebookapi_assignment_submit($node);
+  //gradebookapi_assignment_submit($node);
 }
 
 function assignment_load($node) {
