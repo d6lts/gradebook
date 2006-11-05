@@ -11,9 +11,11 @@ function gradebook_help($section) {
 }
 
 // hook_perm
+/*
 function gradebook_perm() {
   return array('view gradebook', 'view own gradebook', 'edit gradebook');
 }
+*/
 
 // hook_menu
 function gradebook_menu($may_cache) {
@@ -27,14 +29,15 @@ function gradebook_menu($may_cache) {
     $items[] = array(
       'path'     => 'gradebook',
       'title'    => t('gradebook'),
-      'access'   => user_access('view gradebook')||user_access('view own gradebook'),
+      //'access'   => gradebookapi_is_student($gradebook)||gradebookapi_is_teacher($gradebook),
       'callback' => 'gradebook_page',
     );
   }
   else {
-    theme_add_style(drupal_get_path('module', 'gradebook') .'/gradebook.css');
     if (is_numeric(arg(1)) || (variable_get('gradebook_show_default', 1))) {
+      theme_add_style(drupal_get_path('module', 'gradebook') .'/gradebook.css');
       $gradebook = (is_numeric(arg(1))?gradebookapi_gradebook_load(arg(1)):gradebookapi_default_gradebook_load());
+      
       if (is_numeric(arg(1))) {
         $items[] = array(
           'path'               => _gradebook_base_url(),
@@ -42,6 +45,7 @@ function gradebook_menu($may_cache) {
           'type'               => MENU_CALLBACK,
           'callback'           => 'gradebook_gradebook_page',
           'callback arguments' => array($gradebook),
+          'access'             => gradebookapi_is_teacher($gradebook),
         );
       }
       $items[] = array(
@@ -53,7 +57,7 @@ function gradebook_menu($may_cache) {
       $items[] = array(
         'path'               => _gradebook_base_url().'/rebuild',
         'title'              => t('rebuild'),
-        'access'             => user_access('edit gradebook'),
+        'access'             => gradebookapi_is_teacher($gradebook),
         'callback'           => 'gradebook_rebuild_page',
         'callback arguments' => array($gradebook),
         'type'               => MENU_LOCAL_TASK,
@@ -61,7 +65,7 @@ function gradebook_menu($may_cache) {
       $items[] = array(
         'path'               => _gradebook_base_url().'/category',
         'title'              => t('categories'),
-        'access'             => user_access('edit gradebook'),
+        'access'             => gradebookapi_is_teacher($gradebook),
         'callback'           => 'gradebook_category_page',
         'callback arguments' => array($gradebook),
         'type'               => MENU_LOCAL_TASK,
@@ -75,7 +79,7 @@ function gradebook_menu($may_cache) {
       $items[] = array(
         'path'               => _gradebook_base_url().'/category/add',
         'title'              => t('add category'),
-        'access'             => user_access('edit gradebook'),
+        'access'             => gradebookapi_is_teacher($gradebook),
         'callback'           => 'gradebook_category_form',
         'callback arguments' => array($gradebook),
         'type'               => MENU_LOCAL_TASK,
@@ -90,7 +94,7 @@ function gradebook_menu($may_cache) {
             'title' => t('edit category'),
             'callback' => 'gradebook_category_form',
             'callback arguments' => array($gradebook, (array)$term),
-            'access' => user_access('edit gradebook'),
+            'access' => gradebookapi_is_teacher($gradebook),
             'type' => MENU_CALLBACK,
           );
         }
@@ -101,9 +105,9 @@ function gradebook_menu($may_cache) {
           $items[] = array(
             'path' => _gradebook_base_url().'/grade',
             'title' => t('edit grade'),
-            'callback' => (user_access('edit gradebook')?'gradebook_grade_form':'gradebook_grade_view'),
+            'callback' => (gradebookapi_is_teacher($gradebook)?'gradebook_grade_form':'gradebook_grade_view'),
             'callback arguments' => array($gradebook, (array)$grade),
-            'access' => user_access('edit gradebook') || $grade->note,
+            'access' => gradebookapi_is_teacher($gradebook) || $grade->note,
             'type' => MENU_CALLBACK,
           );
         }
@@ -117,7 +121,7 @@ function gradebook_menu($may_cache) {
             'title' => t('edit category'),
             'callback' => 'gradebook_category_form',
             'callback arguments' => array($gradebook, (array)$term),
-            'access' => user_access('edit gradebook'),
+            'access' => gradebookapi_is_teacher($gradebook),
             'type' => MENU_CALLBACK,
           );
         }
@@ -128,9 +132,9 @@ function gradebook_menu($may_cache) {
           $items[] = array(
             'path' => _gradebook_base_url().'/grade',
             'title' => t('edit grade'),
-            'callback' => (user_access('edit gradebook')?'gradebook_grade_form':'gradebook_grade_view'),
+            'callback' => (gradebookapi_is_teacher($gradebook)?'gradebook_grade_form':'gradebook_grade_view'),
             'callback arguments' => array($gradebook, (array)$grade),
-            'access' => user_access('edit gradebook') || $grade->note,
+            'access' => gradebookapi_is_teacher($gradebook) || $grade->note,
             'type' => MENU_CALLBACK,
           );
         }
@@ -249,11 +253,20 @@ function gradebook_gradebook_page($gradebook) {
     $assignments[$assignment->nid] = node_load($assignment->nid);
   }
 
-  if (user_access('view gradebook')) {
+  if (gradebookapi_is_teacher($gradebook)) {
+    /*
     if ( $str_rids = implode(',', array_keys(_gradebook_student_roles())) )
       $result = db_query("SELECT u.uid, u.name FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status != 0 AND r.rid IN (". $str_rids .") ORDER BY u.name ASC");
-    else
+    else {
       $result = FALSE;
+    }
+    */
+    $students = gradebookapi_get_students($gradebook);
+    if ( $str_uids = implode(',', $students) )
+      $result = db_query("SELECT u.uid, u.name FROM {users} u WHERE u.status != 0 AND u.uid IN (". $str_uids .") ORDER BY u.name ASC");
+    else {
+      $result = FALSE;
+    }
   }
   else {
     $result = db_query("SELECT uid, name FROM {users} WHERE uid=%d", $user->uid);
@@ -345,7 +358,7 @@ function theme_gradebook_page($gradebook, $assignments, $student_grades) {
         foreach ($assignments_sorted[$category->tid] as $assignment) {
           $grade = $grades[$assignment->nid];
           /*
-          if (user_access('edit gradebook')) {
+          if (gradebookapi_is_teacher($gradebook)) {
             //$row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
             $row[] = array(
               'data' => l(theme_gradebook_grade($grade), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid),
@@ -360,7 +373,7 @@ function theme_gradebook_page($gradebook, $assignments, $student_grades) {
             );
           }
           */
-          $row[] = theme_gradebook_assignment_grade($grade);
+          $row[] = theme_gradebook_assignment_grade($gradebook, $grade);
         }
       }
     }
@@ -368,7 +381,7 @@ function theme_gradebook_page($gradebook, $assignments, $student_grades) {
       foreach ($assignments_sorted['root'] as $assignment) {
         $grade = $grades[$assignment->nid];
         /*
-        if (user_access('edit gradebook')) {
+        if (gradebookapi_is_teacher($gradebook)) {
           //$row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
           $row[] = array(
             'data' => l(theme_gradebook_grade($grade), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid),
@@ -382,19 +395,19 @@ function theme_gradebook_page($gradebook, $assignments, $student_grades) {
           );
         }
         */
-        $row[] = theme_gradebook_assignment_grade($grade);
+        $row[] = theme_gradebook_assignment_grade($gradebook, $grade);
       }
     }
 
     $grade = gradebookapi_get_term_grade($account->uid, $gradebook->tid);
-    $row[] = theme_gradebook_term_grade($grade);
+    $row[] = theme_gradebook_term_grade($gradebook, $grade);
     $rows[] = $row;
   }
 
   return theme('gradebook_table', $headers, $rows, array('class'=>'gradebook'));
 }
 
-function theme_gradebook_assignment_grade($grade) {
+function theme_gradebook_assignment_grade($gradebook, $grade) {
   if (isset($grade->earned)) {
     $results = gradebookapi_invoke_gradebookapi('view', 'grade', $grade);
     if (count($results)) {
@@ -409,7 +422,7 @@ function theme_gradebook_assignment_grade($grade) {
   }
   
   $ret = array();
-  if (user_access('edit gradebook') || $grade->note) {
+  if (gradebookapi_is_teacher($gradebook) || $grade->note) {
     $ret['data'] = l($text, _gradebook_base_url().'/grade/'.$grade->uid.'/'.$grade->nid);
   }
   else {
@@ -420,7 +433,7 @@ function theme_gradebook_assignment_grade($grade) {
   return $ret;
 }
 
-function theme_gradebook_term_grade($grade) {
+function theme_gradebook_term_grade($gradebook, $grade) {
   if (isset($grade->earned)) {
     $results = gradebookapi_invoke_gradebookapi('view', 'grade', $grade);
     if (count($results)) {
@@ -522,7 +535,7 @@ function theme_gradebook_page_old($gradebook, $assignments, $student_grades) {
     $row[] = theme('username', $account);
     foreach ($assignments as $assignment) {
       $grade = $grades[$assignment->nid];
-      if (user_access('edit gradebook')) {
+      if (gradebookapi_is_teacher($gradebook)) {
         $row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
       }
       else {
@@ -840,6 +853,7 @@ function gradebook_category_confirm_delete_submit($form_id, $form_values) {
   return 'admin/forum';
 }
 
+/*
 function _gradebook_student_roles() {
   $roles = user_roles();
   unset($roles[DRUPAL_ANONYMOUS_RID]);
@@ -869,6 +883,7 @@ function _gradebook_teacher_roles() {
   
   return $roles;
 }
+*/
 
 function gradebook_rebuild_page($gradebook) {
   gradebookapi_rebuild_grades($gradebook->tid);
