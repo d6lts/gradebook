@@ -19,6 +19,7 @@ function gradebook_perm() {
 
 // hook_menu
 function gradebook_menu($may_cache) {
+  global $user;
   $items = array();
   
   // The $may_cache parameter is used to divide menu items into two parts. Those
@@ -41,11 +42,11 @@ function gradebook_menu($may_cache) {
       if (is_numeric(arg(1))) {
         $items[] = array(
           'path'               => _gradebook_base_url(),
-          'title'              => t('view'),
+          'title'              => $gradebook->name,
           'type'               => MENU_CALLBACK,
           'callback'           => 'gradebook_gradebook_page',
           'callback arguments' => array($gradebook),
-          'access'             => gradebookapi_is_teacher($gradebook),
+          'access'             => (gradebookapi_is_teacher($gradebook)||gradebookapi_is_student($gradebook)),
         );
       }
       $items[] = array(
@@ -104,10 +105,10 @@ function gradebook_menu($may_cache) {
           $grade = gradebookapi_get_grade($uid, $nid);
           $items[] = array(
             'path' => _gradebook_base_url().'/grade',
-            'title' => t('edit grade'),
+            'title' => (gradebookapi_is_teacher($gradebook)?t('edit grade'):t('view grade')),
             'callback' => (gradebookapi_is_teacher($gradebook)?'gradebook_grade_form':'gradebook_grade_view'),
             'callback arguments' => array($gradebook, (array)$grade),
-            'access' => gradebookapi_is_teacher($gradebook) || $grade->note,
+            'access' => gradebookapi_is_teacher($gradebook) || $user->uid == $uid,
             'type' => MENU_CALLBACK,
           );
         }
@@ -131,10 +132,10 @@ function gradebook_menu($may_cache) {
           $grade = gradebookapi_get_grade($uid, $nid);
           $items[] = array(
             'path' => _gradebook_base_url().'/grade',
-            'title' => t('edit grade'),
+            'title' => (gradebookapi_is_teacher($gradebook)?t('edit grade'):t('view grade')),
             'callback' => (gradebookapi_is_teacher($gradebook)?'gradebook_grade_form':'gradebook_grade_view'),
             'callback arguments' => array($gradebook, (array)$grade),
-            'access' => gradebookapi_is_teacher($gradebook) || $grade->note,
+            'access' => gradebookapi_is_teacher($gradebook) || $user->uid == $uid,
             'type' => MENU_CALLBACK,
           );
         }
@@ -242,25 +243,62 @@ function gradebook_list() {
   return theme('table', $header, $rows);
 }
 
-function gradebook_gradebook_page($gradebook) {
+function gradebook_gradebook_page($gradebook, $uid=NULL) {
   global $user;
   $assignments = array();
   $student_grades = array();
-
-  // gradebookapi_select_nodes($gradebook, $tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC')
-  $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'n.created ASC');
-  while ($assignment = db_fetch_object($result)) {
-    $assignments[$assignment->nid] = node_load($assignment->nid);
-  }
-
-  if (gradebookapi_is_teacher($gradebook)) {
-    /*
-    if ( $str_rids = implode(',', array_keys(_gradebook_student_roles())) )
-      $result = db_query("SELECT u.uid, u.name FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status != 0 AND r.rid IN (". $str_rids .") ORDER BY u.name ASC");
-    else {
-      $result = FALSE;
+  $assignment_order = array();
+  $order = isset($_GET['order']) ? $_GET['order'] : '';
+  $sort = isset($_GET['sort']) ? (($_GET['sort'] == 'desc') ? 'desc' : 'asc') : 'asc';
+  
+  // make sure we have permission to be here
+  if (!gradebookapi_is_teacher($gradebook) && $uid) {
+    if ($uid != $user->uid) {
+      drupal_access_denied();
+      return;
     }
-    */
+  }
+  
+  // if not a teacher set uid to own
+  if (!gradebookapi_is_teacher($gradebook)) {
+    $uid = $user->uid;
+  }
+  
+  // get sorted assignments
+  switch($order) {
+    case 'title':
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'n.title ASC');
+      while ($assignment = db_fetch_object($result)) {
+        $assignments[] = node_load($assignment->nid);
+      }
+      break;
+    case 'date':
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'n.created ASC');
+      while ($assignment = db_fetch_object($result)) {
+        $assignments[] = node_load($assignment->nid);
+      }
+      break;
+      break;
+    case 'possible':
+      $values = array();
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'a.possible ASC');
+      while ($assignment = db_fetch_object($result)) {
+        $assignments[] = node_load($assignment->nid);
+      }
+      break;
+    case 'category':
+    default:
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'td.name ASC');
+      while ($assignment = db_fetch_object($result)) {
+        $assignments[] = node_load($assignment->nid);
+      }
+      break;
+  }
+  
+  if ($uid) {
+    $result = db_query("SELECT uid, name FROM {users} WHERE uid=%d", $uid);
+  }
+  else {
     $students = gradebookapi_get_students($gradebook);
     if ( $str_uids = implode(',', $students) )
       $result = db_query("SELECT u.uid, u.name FROM {users} u WHERE u.status != 0 AND u.uid IN (". $str_uids .") ORDER BY u.name ASC");
@@ -268,9 +306,7 @@ function gradebook_gradebook_page($gradebook) {
       $result = FALSE;
     }
   }
-  else {
-    $result = db_query("SELECT uid, name FROM {users} WHERE uid=%d", $user->uid);
-  }
+
   if ($result) {
     while ($account = db_fetch_object($result)) {
       $student_grades[$account->uid] = array();
@@ -285,118 +321,48 @@ function gradebook_gradebook_page($gradebook) {
 }
 
 function theme_gradebook_page($gradebook, $assignments, $student_grades) {
-  $headers = array();
+  $headers = array(
+    'category' => array(l('category', _gradebook_base_url(), '', 'order=category&sort=asc')),
+    'possible' => array(l('possible', _gradebook_base_url(), '', 'order=possible&sort=asc')),
+    'date' => array(l('date', _gradebook_base_url(), '', 'order=date&sort=asc')),
+    'title' => array(l('title', _gradebook_base_url(), '', 'order=title&sort=asc')),
+  );
   $rows = array();
   
-  $vid = gradebookapi_get_vid();
-  $categories = taxonomy_get_children($gradebook->tid, $vid);
-  $category_tids = array();
-  $assignments_sorted = array('root'=>array());
-  
-  $found = FALSE;
-  
-  // collect tids from categories
-  foreach ($categories as $category) {
-    $tree = taxonomy_get_tree(gradebookapi_get_vid(), $category->tid);
-    $category_tids[$category->tid][] = $category->tid;
-    $category_tids[$category->tid] = array_merge($category_tids[$category->tid], array_map('_taxonomy_get_tid_from_term', $tree));
+  $sort = NULL;
+  if ($order = isset($_GET['order']) ? $_GET['order'] : '') {
+    $sort .= 'order='.$order;
+    $sort .= '&sort=' . (isset($_GET['sort']) ? (($_GET['sort'] == 'desc') ? 'desc' : 'asc') : 'asc');
   }
   
-  // sort assignments
+  
   foreach ($assignments as $assignment) {
-    $found = FALSE;
-    $terms = taxonomy_node_get_terms($assignment->nid);
+    $terms = gradebookapi_assignment_terms($assignment);
+    $category = '';
     foreach ($terms as $term) {
-      // make sure we only look in the gradebook vocabulary
-      if ($term->vid == $vid) {
-        // search category tids
-        foreach ($category_tids as $categorytid => $tids) {
-          if (in_array($term->tid, $tids)) {
-            $assignments_sorted[$categorytid][$assignment->nid] = $assignment;
-            $found = TRUE;
-          }
-        }
+      if ($category) {
+        $category .= ', '.$term->name;
+      }
+      else {
+        $category .= $term->name;
       }
     }
-    // assignment is not in a category
-    if (!$found) {
-      $assignments_sorted['root'][$assignment->nid] = $assignment;
-    }
+    $headers['category'][] = array('data'=>$category, 'class'=>'assignment_category');
+    $headers['possible'][] = array('data'=>$assignment->possible, 'class'=>'assignment_possible');
+    $headers['date'][] = array('data'=>format_date($assignment->created, 'custom', 'Y/m/d'), 'class'=>'assignment_date');
+    $headers['title'][] = array('data'=>l($assignment->title, 'node/'.$assignment->nid), 'class'=>'assignment_title');
   }
-  
-  $header1 = array();
-  $header2 = array();
-  $header1[] = array('data'=>'', 'class'=>'category'); // student name
-  $header2[] = array('data'=>'', 'class'=>'assignment'); // student name
-  foreach ($categories as $category) {
-    if (count($assignments_sorted[$category->tid])) {
-      $header1[] = array('data'=>$category->name, 'colspan'=>count($assignments_sorted[$category->tid]), 'class'=>'category');
-      foreach ($assignments_sorted[$category->tid] as $assignment) {
-        $header2[] = l($assignment->title, 'node/'.$assignment->nid) . '<br />' . $assignment->gradebookapi['possible'];
-      }
-    }
-  }
-  if (count($assignments_sorted['root'])) {
-    $header1[] = array('data'=>'', 'colspan'=>count($assignments_sorted['root']), 'class'=>'assignment');
-    foreach ($assignments_sorted['root'] as $assignment) {
-      $header2[] = l($assignment->title, 'node/'.$assignment->nid) . '<br />' . $assignment->gradebookapi['possible'];
-    }
-  }
-  $header1[] = array('data'=>'', 'class'=>'category'); // total grade
-  $header2[] = array('data'=>'', 'class'=>'assignment'); // total grade
-  $headers[] = $header1;
-  $headers[] = $header2;
   
   foreach ($student_grades as $uid => $grades) {
     $row = array();
     
     $account = user_load(array('uid'=>$uid));
-    $row[] = theme('username', $account);
+    //$row[] = theme('username', $account);
+    $row[] = l($account->name, _gradebook_base_url().'/'.$account->uid, '', $sort);
     
-    foreach ($categories as $category) {
-      if (count($assignments_sorted[$category->tid])) {
-        foreach ($assignments_sorted[$category->tid] as $assignment) {
-          $grade = $grades[$assignment->nid];
-          /*
-          if (gradebookapi_is_teacher($gradebook)) {
-            //$row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
-            $row[] = array(
-              'data' => l(theme_gradebook_grade($grade), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid),
-              'class' => ($grade->exempt?'exempt':'')
-            );
-          }
-          else {
-            //$row[] = ($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--'));
-            $row[] = array(
-              'data' => theme_gradebook_grade($grade),
-              'class' => ($grade->exempt?'exempt':'')
-            );
-          }
-          */
-          $row[] = theme_gradebook_assignment_grade($gradebook, $grade);
-        }
-      }
-    }
-    if (count($assignments_sorted['root'])) {
-      foreach ($assignments_sorted['root'] as $assignment) {
-        $grade = $grades[$assignment->nid];
-        /*
-        if (gradebookapi_is_teacher($gradebook)) {
-          //$row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
-          $row[] = array(
-            'data' => l(theme_gradebook_grade($grade), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid),
-            'class' => ($grade->exempt?'exempt':'')
-          );
-        }
-        else {
-          $row[] = array(
-            'data' => theme_gradebook_grade($grade),
-            'class' => ($grade->exempt?'exempt':'')
-          );
-        }
-        */
-        $row[] = theme_gradebook_assignment_grade($gradebook, $grade);
-      }
+    foreach ($assignments as $assignment) {
+      $grade = $grades[$assignment->nid];
+      $row[] = theme_gradebook_assignment_grade($gradebook, $grade);
     }
 
     $grade = gradebookapi_get_term_grade($account->uid, $gradebook->tid);
@@ -440,11 +406,22 @@ function theme_gradebook_term_grade($gradebook, $grade) {
       return array_pop($results);
     }
     else {
-      return $grade->earned . '/' . $grade->possible;
+      return $grade->earned . '/' . $grade->possible . (($grade->earned)?(' ('.sprintf('%.1f', ($grade->earned/$grade->possible)*100).'%)'):'');
     }
   }
   else {
     return variable_get('gradebook_empty_grade', '--');
+  }
+}
+
+function _gradebook_tablesort_sql($headers, $before = '') {
+  foreach ($headers as $header) {
+    $ts = tablesort_init($header);
+    if ($ts['sql']) {
+      $sql = db_escape_string($ts['sql']);
+      $sort = drupal_strtoupper(db_escape_string($ts['sort']));
+      return " ORDER BY $before $sql $sort";
+    }
   }
 }
 
@@ -513,40 +490,6 @@ function theme_gradebook_table($headers, $rows, $attributes = array(), $caption 
 
   $output .= "</tbody></table>\n";
   return $output;
-}
-
-function theme_gradebook_page_old($gradebook, $assignments, $student_grades) {
-  $header = array();
-  $rows = array();
-  
-  //return 'theme_gradebook_page('.print_r($gradebook, TRUE).', '.print_r($assignments, TRUE).', '.print_r($student_grades, TRUE).')';
-  
-  // TODO: how should we render categories?
-  
-  $header[] = ''; // student name
-  foreach ($assignments as $assignment) {
-    $header[] = l($assignment->title, 'node/'.$assignment->nid) . '<br />' . $assignment->gradebookapi['possible'];
-  }
-  $header[] = ''; // total grade
-  
-  foreach ($student_grades as $uid => $grades) {
-    $account = user_load(array('uid'=>$uid));
-    $row = array();
-    $row[] = theme('username', $account);
-    foreach ($assignments as $assignment) {
-      $grade = $grades[$assignment->nid];
-      if (gradebookapi_is_teacher($gradebook)) {
-        $row[] = l(($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--')), _gradebook_base_url().'/grade/'.$account->uid.'/'.$assignment->nid);
-      }
-      else {
-        $row[] = ($grade->earned?$grade->earned:variable_get('gradebook_empty_grade', '--'));
-      }
-    }
-    $grade = gradebookapi_get_term_grade($account->uid, $gradebook->tid);
-    $row[] = $grade->earned . '/' . $grade->possible;
-    $rows[] = $row;
-  }
-  return theme('table', $header, $rows);
 }
 
 function gradebook_category_page($gradebook) {

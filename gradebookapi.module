@@ -161,7 +161,48 @@ function gradebookapi_select_nodes($gradebook, $tids = array(), $operator = 'or'
   $tids[] = $gradebook->tid; // add in gradebook tid
   
   // taxonomy_select_nodes($tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC')
-  return taxonomy_select_nodes($use_tids, $operator, $depth, $pager, $order);
+  return _gradebookapi_select_nodes($use_tids, $operator, $depth, $pager, $order);
+}
+
+function _gradebookapi_select_nodes($tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC') {
+  if (count($tids) > 0) {
+    // For each term ID, generate an array of descendant term IDs to the right depth.
+    $descendant_tids = array();
+    if ($depth === 'all') {
+      $depth = NULL;
+    }
+    foreach ($tids as $index => $tid) {
+      $term = taxonomy_get_term($tid);
+      $tree = taxonomy_get_tree($term->vid, $tid, -1, $depth);
+      $descendant_tids[] = array_merge(array($tid), array_map('_taxonomy_get_tid_from_term', $tree));
+    }
+
+    if ($operator == 'or') {
+      $str_tids = implode(',', call_user_func_array('array_merge', $descendant_tids));
+      $sql = 'SELECT DISTINCT(n.nid), n.sticky, n.title, n.created FROM {node} n INNER JOIN {term_node} tn ON n.nid = tn.nid INNER JOIN {term_data} td ON tn.tid = td.tid INNER JOIN {gradebookapi_assignment} a ON n.nid = a.nid WHERE tn.tid IN ('. $str_tids .') AND n.status = 1 ORDER BY '. $order;
+      $sql_count = 'SELECT COUNT(DISTINCT(n.nid)) FROM {node} n INNER JOIN {term_node} tn ON n.nid = tn.nid INNER JOIN {term_data} td ON tn.tid = td.tid INNER JOIN {gradebookapi_assignment} a ON n.nid = a.nid WHERE tn.tid IN ('. $str_tids .') AND n.status = 1';
+    }
+    else {
+      $joins = 'INNER JOIN {gradebookapi_assignment} a ON n.nid = a.nid';
+      $wheres = '';
+      foreach ($descendant_tids as $index => $tids) {
+        $joins .= ' INNER JOIN {term_node} tn'. $index .' ON n.nid = tn'. $index .'.nid INNER JOIN {term_data} td ON tn'. $index .'.tid = td.tid';
+        $wheres .= ' AND tn'. $index .'.tid IN ('. implode(',', $tids) .')';
+      }
+      $sql = 'SELECT DISTINCT(n.nid), n.sticky, n.title, n.created FROM {node} n '. $joins .' WHERE n.status = 1 '. $wheres .' ORDER BY '. $order;
+      $sql_count = 'SELECT COUNT(DISTINCT(n.nid)) FROM {node} n '. $joins .' WHERE n.status = 1 ' . $wheres;
+    }
+    $sql = db_rewrite_sql($sql);
+    $sql_count = db_rewrite_sql($sql_count);
+    if ($pager) {
+      $result = pager_query($sql, variable_get('default_nodes_main', 10), 0, $sql_count);
+    }
+    else {
+      $result = db_query_range($sql, 0, variable_get('feed_default_items', 10));
+    }
+  }
+
+  return $result;
 }
 
 function gradebookapi_get_grade($uid, $nid) {
@@ -384,6 +425,21 @@ function gradebookapi_taxonomy($op, $type, $obj = NULL) {
         break;
     }
   }
+}
+
+function gradebookapi_assignment_terms($node) {
+  $terms = array();
+  $vid = gradebookapi_get_vid();
+  $allterms = taxonomy_node_get_terms($node->nid);
+
+  foreach ($allterms as $term) {
+    // make sure we only look in the gradebook vocabulary
+    if ($term->vid == $vid) {
+      $terms[] = $term;
+    }
+  }
+  
+  return $terms;
 }
 
 function gradebookapi_assignment_load($node) {

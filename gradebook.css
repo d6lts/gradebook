@@ -1,3 +1,4 @@
+/*
 .gradebook .category {
   text-align: left;
   padding-right: 1em;
@@ -5,7 +6,7 @@
   border-bottom: none;
   background: #F0F0F0;
 }
-
+*/
 .gradebook  .exempt, .gradebook  .exempt a {
   text-decoration: line-through;
   color: #AA0000;
