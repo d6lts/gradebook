@@ -42,6 +42,7 @@ function assignment_access($op, $node) {
       }
       break;
   }
+  return FALSE;
 }
 
 // hook_menu
