@@ -535,6 +535,9 @@ function gradebookapi_nodeapi($node, $op, $arg = 0) {
       case 'view':
         gradebookapi_assignment_view($node);
         break;
+      case 'validate':
+        gradebookapi_assignment_validate($node);
+        break;
     }
   }
 }

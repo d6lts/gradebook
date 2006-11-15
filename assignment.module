@@ -94,6 +94,9 @@ function assignment_form(&$node) {
   return $form;
 }
 
+// This code is already executed in gradebookapi_nodeapi
+// See bug report: http://drupal.org/node/97406
+/*
 function assignment_validate(&$node) {
   gradebookapi_assignment_validate($node);
 }
@@ -117,6 +120,7 @@ function assignment_update($node) {
 function assignment_delete($node) {
   gradebookapi_assignment_delete($node);
 }
+*/
 
 function assignment_form_submit() {
 }
