@@ -31,6 +31,7 @@ function gradebook_menu($may_cache) {
       'path'     => 'gradebook',
       'title'    => t('gradebook'),
       //'access'   => gradebookapi_is_student($gradebook)||gradebookapi_is_teacher($gradebook),
+      'access' => user_access('access content'),
       'callback' => 'gradebook_page',
     );
   }
@@ -150,6 +151,21 @@ function gradebook_menu($may_cache) {
 function gradebook_settings() {
   $form = array();
   
+  $form['default'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Default gradebook settings'),
+    '#weight' => -1,
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+  
+  $form['default']['gradebook_show_default'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Show default gradebook'),
+    '#default_value' => variable_get('gradebook_show_default', 1),
+    '#description' =>  t('Show the default gradebook.'),
+  );
+  
   $roles = user_roles();
   unset($roles[DRUPAL_ANONYMOUS_RID]);
   
@@ -160,7 +176,7 @@ function gradebook_settings() {
       $default[] = $rid;
     }
   }
-  $form['gradebook_student_rids'] = array(
+  $form['default']['gradebook_student_rids'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Student roles'),
     '#default_value' => $default,
@@ -176,7 +192,7 @@ function gradebook_settings() {
       $default[] = $rid;
     }
   }
-  $form['gradebook_teacher_rids'] = array(
+  $form['default']['gradebook_teacher_rids'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Teacher roles'),
     '#default_value' => $default,
@@ -184,15 +200,16 @@ function gradebook_settings() {
     '#description' =>  t('Check at least one role.'),
     '#required' => TRUE,
   );
-  
-  $form['gradebook_show_default'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Show default gradebook'),
-    '#default_value' => variable_get('gradebook_show_default', 1),
-    '#description' =>  t('Show the default gradebook or list gradebooks.'),
+
+  $form['general'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Default gradebook settings'),
+    '#weight' => 0,
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
   );
   
-  $form['gradebook_empty_grade'] = array(
+  $form['general']['gradebook_empty_grade'] = array(
     '#type' => 'textfield',
     '#title' => t('Empty grade'),
     '#default_value' => variable_get('gradebook_empty_grade', '--'),
@@ -233,11 +250,16 @@ function gradebook_page($gid = 0) {
 
 function gradebook_list() {
   $vid = gradebookapi_get_vid();
-  $terms = taxonomy_get_tree($vid, 0, -1, 1);
+  $default = gradebookapi_default_gradebook_load();
+  $gradebooks = taxonomy_get_tree($vid, 0, -1, 1);
   
   $header = array();
-  foreach ($terms as $term) {
-    $rows[] = array(l($term->name, _gradebook_base_url().'/'.$term->tid));
+  foreach ($gradebooks as $gradebook) {
+    if ( (variable_get('gradebook_show_default', 1)) | ($gradebook->tid != $default->tid) ) {
+      if (gradebookapi_is_teacher($gradebook) || gradebookapi_is_student($gradebook)) {
+        $rows[] = array(l($gradebook->name, _gradebook_base_url().'/'.$gradebook->tid));
+      }
+    }
   }
   
   return theme('table', $header, $rows);
