@@ -18,7 +18,7 @@ function gradebookapi_install() {
         earned int(10) NOT NULL default '0',
         exempt int(2) NOT NULL default '0',
         timestamp int(11) NOT NULL default '0',
-        note longtext NOT NULL default '',
+        note longtext NULL,
         PRIMARY KEY  (uid, nid)
         )");
       db_query("CREATE TABLE {gradebookapi_cache} (
@@ -41,7 +41,7 @@ function gradebookapi_install() {
         \"earned\" int(10) NOT NULL default '0',
         \"exempt\" int(2) NOT NULL default '0',
         \"timestamp\" int(11) NOT NULL default '0',
-        \"note\" longtext NOT NULL,
+        \"note\" longtext NULL,
         PRIMARY KEY  (\"uid\",\"nid\")
         )");
       db_query("CREATE TABLE \"gradebookapi_cache\" (

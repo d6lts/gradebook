@@ -1,0 +1,5 @@
+; $Id$
+name = Gradebook API
+description = "Provides a gradebook API."
+package = Gradebook
+dependencies = taxonomy

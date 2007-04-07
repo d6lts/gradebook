@@ -1,21 +1,20 @@
 <?php
 // $Id$
 
-// hook_help
-function gradebookapi_help($section) {
-  switch ($section) {
-    case 'admin/modules#description':
-      // This description is shown in the listing at admin/modules.
-      return t('Provides a gradebook API.');
-  }
-}
-
-// hook_perm
+/**
+ * hook_perm
+ *
+ * @return array
+ */
 function gradebookapi_perm() {
   return array('admin gradebookapi');
 }
 
-// hook_menu
+/**
+ * hook_menu
+ *
+ * @return array
+ */
 function gradebookapi_menu($may_cache) {
   $items = array();
   
@@ -25,34 +24,52 @@ function gradebookapi_menu($may_cache) {
   // certain paths. Most modules will have excusively cacheable menu items.
   if ($may_cache) {
     $items[] = array(
-      'path'     => 'admin/settings/gradebookapi',
-      'title'    => t('gradebookapi'),
-      'access'   => user_access('admin gradebookapi'),
-      'callback' => 'gradebookapi_admin_settings',
+      'path' => 'admin/gradebook',
+      'title' => t('Gradebook'),
+      'description' => t('Administer the suite of Gradebook modules.'),
+      'position' => 'right',
+      'weight' => -5,
+      'callback' => 'system_admin_menu_block_page',
+      'access' => user_access('administer site configuration')
+      );
+    $items[] = array(
+      'path' => 'admin/gradebook/gradebookapi',
+      'title' => t('Gradebook API'),
+      'description' => t('Provides a gradebook API.'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => array('gradebookapi_admin_settings'),
+      'access' => user_access('administer site configuration'),
+      'type' => MENU_NORMAL_ITEM, // optional
     );
   }
   
   return $items;
 }
 
-// hook_settings
 function gradebookapi_admin_settings() {
   $form = array();
   
+  $form['#submit']['gradebookapi_admin_settings_submit'] = array(); // custom submit handler
+  $form['#submit']['system_settings_form_submit'] = array(); // form.inc never calls the $callback if a submit handler is defined
+  drupal_set_title(t('Gradebook API configuration'));
+
   $vid = gradebookapi_get_vid();
   $vocabulary = taxonomy_get_vocabulary($vid);
-  
+
+  $options = array();
+  $node_types = node_get_types();
+  foreach ($node_types as $id => $type)
+    $options[$id] = $type->name;
+
   $form['nodes'] = array(
     '#type' => 'checkboxes',
-    '#title' => t('Types'),
-    '#default_value' => $vocabulary->nodes,
-    '#options' => node_get_types(),
-    '#description' => t('A list of assignment types you want to associate with this gradebook.'),
-    '#required' => TRUE,
+    '#title' => t('Assignment Types'),
+    '#default_value' => array_filter($vocabulary->nodes),
+    '#options' => $options,
+    '#description' => t('A list of node types you want to treat as assignments.'),
   ); 
-  $form['submit'] = array('#type' => 'submit', '#value' => t('Submit'));
-  
-  return drupal_get_form('gradebookapi_admin_settings', $form);
+
+  return system_settings_form($form);
 }
 
 function gradebookapi_admin_settings_submit($form_id, $form_values) {
@@ -62,13 +79,14 @@ function gradebookapi_admin_settings_submit($form_id, $form_values) {
   $vocabulary['nodes'] = array_filter($form_values['nodes']);
   taxonomy_save_vocabulary($vocabulary);
   
+  // TODO: look over this code
   // rebuild grades in each gradebook
   //$terms = taxonomy_get_tree($vid, 0, -1, 1);
   //foreach ($terms as $term) {
   //  gradebookapi_rebuild_grades($term->tid);
   //}
   
-  drupal_set_message(t('Updated gradebookapi settings.')); 
+  //drupal_set_message(t('Updated gradebookapi settings.')); 
 }
 
 function gradebookapi_get_assignment_types() {
@@ -94,15 +112,6 @@ function gradebookapi_get_vid() {
       );
       taxonomy_save_vocabulary($edit);
       $vid = $edit['vid'];
-      
-      $edit = array(
-        'name' => 'default',
-        'description' => '',
-        'vid' => $vid,
-        'weight' => 0
-      );
-      taxonomy_save_term($edit);
-      variable_set('gradebookapi_default_tid', $edit['tid']);
     }
     variable_set('gradebookapi_nav_vocabulary', $vid);
   }
@@ -110,16 +119,9 @@ function gradebookapi_get_vid() {
   return $vid;
 }
 
-function gradebookapi_default_gradebook_load() {
-  // get vid to make sure vocab exists
-  $vid = gradebookapi_get_vid();
-  $gid = variable_get('gradebookapi_default_tid', -1);
-  return gradebookapi_gradebook_load($gid);
-}
-
-function gradebookapi_gradebook_load($gid) {
-  if (_gradebookapi_is_root_term($gid)) {
-    return taxonomy_get_term($gid);
+function gradebookapi_gradebook_load($tid) {
+  if (_gradebookapi_is_root_term($tid)) {
+    return taxonomy_get_term($tid);
   }
   return FALSE;
 }
@@ -158,7 +160,7 @@ function gradebookapi_select_nodes($gradebook, $tids = array(), $operator = 'or'
     }
   }
   
-  $tids[] = $gradebook->tid; // add in gradebook tid
+  //$tids[] = $gradebook->tid; // add in gradebook tid
   
   // taxonomy_select_nodes($tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC')
   return _gradebookapi_select_nodes($use_tids, $operator, $depth, $pager, $order);
@@ -190,7 +192,7 @@ function _gradebookapi_select_nodes($tids = array(), $operator = 'or', $depth = 
         $wheres .= ' AND tn'. $index .'.tid IN ('. implode(',', $tids) .')';
       }
       $sql = 'SELECT DISTINCT(n.nid), n.sticky, n.title, n.created FROM {node} n '. $joins .' WHERE n.status = 1 '. $wheres .' ORDER BY '. $order;
-      $sql_count = 'SELECT COUNT(DISTINCT(n.nid)) FROM {node} n '. $joins .' WHERE n.status = 1 ' . $wheres;
+      $sql_count = 'SELECT COUNT(DISTINCT(n.nid)) FROM {node} n ' . $joins . ' WHERE n.status = 1 ' . $wheres;
     }
     $sql = db_rewrite_sql($sql);
     $sql_count = db_rewrite_sql($sql_count);
@@ -206,7 +208,7 @@ function _gradebookapi_select_nodes($tids = array(), $operator = 'or', $depth = 
 }
 
 function gradebookapi_get_grade($uid, $nid) {
-  $grades = gradebookapi_get_grades(array('uid'=>$uid, 'nid'=>$nid));
+  $grades = gradebookapi_get_grades(array('uid' => $uid, 'nid' => $nid));
   if (count($grades)) {
     return array_pop($grades);
   }
@@ -220,7 +222,7 @@ function gradebookapi_get_grade($uid, $nid) {
     $grade->uid = $uid;
     $grade->nid = $nid;
     
-    gradebookapi_invoke_gradebookapi('load', 'grade', $grade);
+    //gradebookapi_invoke_gradebookapi('load', 'grade', $grade);
     return $grade;
   }
 }
@@ -236,7 +238,7 @@ function gradebookapi_get_grades($param = array()) {
 
   $result = db_query('SELECT g.uid, g.nid, g.earned, g.exempt, a.possible, g.timestamp, g.note FROM {gradebookapi_grade} g INNER JOIN {gradebookapi_assignment} a ON g.nid = a.nid WHERE '. $cond, $arguments);
   while ($grade = db_fetch_object($result)) {
-    gradebookapi_invoke_gradebookapi('load', 'grade', $grade);
+    //gradebookapi_invoke_gradebookapi('load', 'grade', $grade);
     $grades[] = $grade;
   }
   
@@ -247,7 +249,7 @@ function gradebookapi_get_term_grade($uid, $tid) {
   $result = db_query("SELECT uid, tid, earned, possible FROM {gradebookapi_cache} WHERE tid=%d AND uid=%d", $tid, $uid);
   $grade = db_fetch_object($result);
   
-  gradebookapi_invoke_gradebookapi('load', 'grade', $grade);
+  //gradebookapi_invoke_gradebookapi('load', 'grade', $grade);
   
   return $grade;
 }
@@ -257,11 +259,11 @@ function gradebookapi_set_grade($grade) {
   $grade->timestamp = time();
   if ($old->timestamp) {
     db_query("UPDATE {gradebookapi_grade} SET earned=%d, exempt=%d, timestamp=%d, note='%s' WHERE uid=%d AND nid=%d", $grade->earned, $grade->exempt, $grade->timestamp, $grade->note, $grade->uid, $grade->nid);
-    gradebookapi_invoke_gradebookapi('update', 'grade', $grade);
+    //gradebookapi_invoke_gradebookapi('update', 'grade', $grade);
   }
   else {
     db_query("INSERT INTO {gradebookapi_grade} (uid, nid, earned, exempt, timestamp, note) VALUES (%d, %d, %d, %d, %d, '%s')", $grade->uid, $grade->nid, $grade->earned, $grade->exempt, $grade->timestamp, $grade->note); 
-    gradebookapi_invoke_gradebookapi('insert', 'grade', $grade);
+    //gradebookapi_invoke_gradebookapi('insert', 'grade', $grade);
   }
   
   $terms = taxonomy_node_get_terms_by_vocabulary($grade->nid, gradebookapi_get_vid());
@@ -349,15 +351,6 @@ function gradebookapi_calc_grades($uid, $tid, $recursive=TRUE) {
 }
 
 function gradebookapi_calc_term_grades($term, $recursive=TRUE) {
-  // TODO: fix reference to _gradebook_student_roles()
-  /*
-  $str_rids = implode(',', array_keys(_gradebook_student_roles()));
-  if ( $str_rids = implode(',', array_keys(_gradebook_student_roles())) )
-    $result = db_query("SELECT u.uid, u.name FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status != 0 AND r.rid IN (". $str_rids .") ORDER BY u.name ASC");
-  else {
-    $result = FALSE;
-  }
-  */
   $gradebook = gradebookapi_get_tid_gradebook($term->tid);
   $students = gradebookapi_get_students($gradebook);
   if ( $str_uids = implode(',', $students) )
@@ -379,7 +372,11 @@ function gradebookapi_calc_assignment_grades($node) {
   }
 }
 
-// hook_taxonomy
+/**
+ * hook_taxonomy
+ *
+ * @return NONE
+ */
 function gradebookapi_taxonomy($op, $type, $obj = NULL) {
   if ($obj['vid'] == gradebookapi_get_vid()) {
     switch ($op) {
@@ -387,6 +384,7 @@ function gradebookapi_taxonomy($op, $type, $obj = NULL) {
       case 'update':
         switch ($type) {
           case 'term':
+            // TODO: can this code be removed?
             // update grade cache
             //if ($obj['parent_old'] && ($obj['parent_old'] != $obj['parent'])) {
               // update old parent, but exclude 'tid' as hierarchy is not updated yet
@@ -419,7 +417,6 @@ function gradebookapi_taxonomy($op, $type, $obj = NULL) {
             break;
           case 'vocabulary':
             variable_del('gradebookapi_nav_vocabulary');
-            variable_del('gradebookapi_default_tid');
             break;
         }
         break;
@@ -485,7 +482,7 @@ function gradebookapi_assignment_form_elements($node) {
     '#type' => 'fieldset',
     '#title' => t('Assignment Settings'),
     '#tree' => FALSE,
-    '#validate' => array('gradebookapi_assignment_validate' => array()),
+    //'#validate' => array('gradebookapi_assignment_validate' => array()),
   );
   $form['gradebookapi']['possible'] = array(
     '#type' => 'textfield',
@@ -501,8 +498,8 @@ function gradebookapi_assignment_form_elements($node) {
 
 function gradebookapi_assignment_validate($form) {
   // safe int check
-  if (is_numeric($form['possible']['#value']) ? intval($form['possible']['#value']) != $form['possible']['#value'] : TRUE) {
-    form_error($form, t('The possible value for the assignment must be an integer.'));
+  if (is_numeric($form->possible) ? intval($form->possible) != $form->possible : TRUE) {
+    form_set_error('possible', t('The possible value for the assignment must be an integer.'));
   }
 }
 
@@ -543,12 +540,13 @@ function gradebookapi_nodeapi($node, $op, $arg = 0) {
 }
 
 /*
-
-module_invoke_all('gradebookapi', $op, $type, &$obj);
-hook_gradebookapi($op, $type, &$obj);
-
-*/
+ *
+ * module_invoke_all('gradebookapi', $op, $type, &$obj);
+ * hook_gradebookapi($op, $type, &$obj);
+ */
 // custom module_invoke_all due to obj reference
+// TODO: This needs to be reviewed and reimplemented if needed
+/*
 function gradebookapi_invoke_gradebookapi($op, $type, &$obj) {
   $return = array();
   foreach (module_implements('gradebookapi') as $name) {
@@ -563,6 +561,7 @@ function gradebookapi_invoke_gradebookapi($op, $type, &$obj) {
   }
   return $return;
 }
+*/
 
 function gradebookapi_is_student($gradebook, $account = NULL) {
   global $user;
@@ -611,67 +610,3 @@ function gradebookapi_get_students($gradebook) {
 function gradebookapi_get_teachers($gradebook) {
   return module_invoke_all('gradebookapi_teachers', $gradebook);
 }
-
-// hook_gradebookapi_students
-function gradebookapi_gradebookapi_students($gradebook) {
-  $students = array();
-  $default = gradebookapi_default_gradebook_load();
-  
-  // is this the default gradebook?
-  if ($gradebook->tid == $default->tid) {
-    $roles = user_roles();
-    unset($roles[DRUPAL_ANONYMOUS_RID]);
-    unset($roles[DRUPAL_AUTHENTICATED_RID]);
-    
-    $sel_roles = (array) variable_get('gradebook_student_rids', array());
-    foreach ($sel_roles as $rid => $value) {
-      if (!$value) {
-        unset($roles[$rid]);
-      }
-    }
-    
-    if (count($roles)) {
-      if ( $str_rids = implode(',', array_keys($roles)) ) {
-        $result = db_query("SELECT u.uid FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status != 0 AND r.rid IN (". $str_rids .")");
-        while ($user = db_fetch_object($result)) {
-          $students[$user->uid] = $user->uid;
-        }
-      }
-    }
-  }
- 
-  return $students;
-}
-
-// hook_gradebookapi_teachers
-function gradebookapi_gradebookapi_teachers($gradebook) {
-  $teachers = array();
-  $default = gradebookapi_default_gradebook_load();
-  
-  // is this the default gradebook?
-  if ($gradebook->tid == $default->tid) {
-    $roles = user_roles();
-    unset($roles[DRUPAL_ANONYMOUS_RID]);
-    unset($roles[DRUPAL_AUTHENTICATED_RID]);
-    
-    $sel_roles = (array) variable_get('gradebook_teacher_rids', array());
-    foreach ($sel_roles as $rid => $value) {
-      if (!$value) {
-        unset($roles[$rid]);
-      }
-    }
-    
-    if (count($roles)) {
-      if ( $str_rids = implode(',', array_keys($roles)) ) {
-        $result = db_query("SELECT u.uid FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status != 0 AND r.rid IN (". $str_rids .")");
-        while ($user = db_fetch_object($result)) {
-          $teachers[$user->uid] = $user->uid;
-        }
-      }
-    }
-  }
- 
-  return $teachers;
-}
-
-
