@@ -2,4 +2,9 @@
 name = Gradebook API
 description = "Provides a gradebook API."
 package = Gradebook
-dependencies = taxonomy
+dependencies[] = taxonomy
+core = 6.x
+; Information added by drupal.org packaging script on 2007-04-07
+version = "6.x-1.x-dev"
+project = "gradebook"
+

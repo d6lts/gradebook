@@ -1,56 +1,65 @@
 <?php
 // $Id$
 
+/**
+ * @file
+ * gradebookapi.install: Install schema for gradebookapi
+ */
+
+/**
+ * Implementation of hook_schema().
+ */
+
+function gradebookapi_schema() {
+  $schema['gradebookapi_assignment'] = array(
+    'fields' => array(
+      'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'possible'    => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+    ),
+    'primary key' => array('nid'),
+  );
+
+  $schema['gradebookapi_grade'] = array(
+    'fields' => array(
+      'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'earned'      => array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
+      'exempt'      => array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'size' => 'tiny', 'default' => 0),
+      'timestamp'   => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'note'        => array('type' => 'text', 'unsigned' => FALSE, 'not null' => FALSE, 'size' => 'big'),
+    ),
+    'primary key' => array('nid', 'uid'),
+  );
+
+  $schema['gradebookapi_cache'] = array(
+    'fields' => array(
+      'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'tid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'earned'      => array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
+      'possible'    => array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
+    ),
+    'primary key' => array('tid', 'uid'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implementation of hook_install().
+ */
+
 function gradebookapi_install() {
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      // the {tablename} syntax is so multisite installs can add a
-      // prefix to the table name as set in the settings.php file
-      db_query("CREATE TABLE {gradebookapi_assignment} (
-        nid int(10) unsigned NOT NULL,
-        possible int(10) NOT NULL default '0',
-        PRIMARY KEY  (nid)
-        )");
-      db_query("CREATE TABLE {gradebookapi_grade} (
-        uid int(10) unsigned NOT NULL,
-        nid int(10) unsigned NOT NULL,
-        earned int(10) NOT NULL default '0',
-        exempt int(2) NOT NULL default '0',
-        timestamp int(11) NOT NULL default '0',
-        note longtext NULL,
-        PRIMARY KEY  (uid, nid)
-        )");
-      db_query("CREATE TABLE {gradebookapi_cache} (
-        uid int(10) unsigned NOT NULL,
-        tid int(10) unsigned NOT NULL,
-        earned int(10) NOT NULL default '0',
-        possible int(10) NOT NULL default '0',
-        PRIMARY KEY  (uid, tid)
-        )");
-      break;
-    case 'pgsql':
-      db_query("CREATE TABLE \"gradebookapi_assignment\" (
-        \"nid\" int(10) unsigned NOT NULL default '0',
-        \"possible\" int(10) NOT NULL default '0',
-        PRIMARY KEY  (\"nid\")
-        )");
-      db_query("CREATE TABLE \"gradebookapi_grade\" (
-        \"uid\" int(10) unsigned NOT NULL default '0',
-        \"nid\" int(10) unsigned NOT NULL default '0',
-        \"earned\" int(10) NOT NULL default '0',
-        \"exempt\" int(2) NOT NULL default '0',
-        \"timestamp\" int(11) NOT NULL default '0',
-        \"note\" longtext NULL,
-        PRIMARY KEY  (\"uid\",\"nid\")
-        )");
-      db_query("CREATE TABLE \"gradebookapi_cache\" (
-        \"uid\" int(10) unsigned NOT NULL default '0',
-        \"tid\" int(10) unsigned NOT NULL default '0',
-        \"earned\" int(10) NOT NULL default '0',
-        \"possible\" int(10) NOT NULL default '0',
-        PRIMARY KEY  (\"uid\",\"tid\")
-        )");
-      break;
-  }
+  // Create tables.
+  drupal_install_schema('gradebookapi');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function gradebookapi_uninstall() {
+  // Remove tables.
+  drupal_uninstall_schema('gradebookapi');
+
+  // Delete all variables.
+  db_query("DELETE FROM {variable} WHERE name LIKE 'gradebookapi_%%'");
 }

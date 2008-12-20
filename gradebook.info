@@ -2,4 +2,6 @@
 name = Gradebook
 description = "Provides a simple gradebook."
 package = Gradebook
-dependencies = gradebookapi
+dependencies[] = gradebookapi
+core = 6.x
+
