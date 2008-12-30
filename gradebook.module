@@ -492,6 +492,7 @@ function _gradebook_parent_select($root, $tid, $title) {
  */
 function gradebook_gradebook_page($gradebook, $uid = NULL) {
   global $user;
+  $user = user_load(array('uid' => $user->uid));
   $assignments = array();
   $student_grades = array();
   $assignment_order = array();
@@ -499,7 +500,7 @@ function gradebook_gradebook_page($gradebook, $uid = NULL) {
   $sort = isset($_GET['sort']) ? (($_GET['sort'] == 'desc') ? 'DESC' : 'ASC') : 'ASC';
 
   // make sure we have permission to be here
-  if (!gradebookapi_is_teacher($gradebook) && !is_null($uid)) {
+  if (!gradebookapi_is_teacher($gradebook) && !empty($uid)) {
     if ($uid != $user->uid) {
       drupal_access_denied();
       return;
