@@ -136,7 +136,7 @@ function gradebook_admin_settings() {
     '#weight'      => -1,
     '#collapsible' => TRUE,
     '#collapsed'   => FALSE,
-    '#description' => t('Any student and teacher roles selected here will apply to ALL gradebooks. If you are using the OG_Gradebook module, this is probably not what you want.'),
+    '#description' => t('Any student and teacher roles selected here will apply to ALL gradebooks. If you are using the OG_Gradebook module, do not select any names here and gradebooks will be formed by group membership. Otherwise, any roles selected here will appear in the gradebook for each group.'),
   );
 
   $roles = user_roles();
@@ -155,7 +155,7 @@ function gradebook_admin_settings() {
     '#title' => t('Student roles'),
     '#default_value' => $default,
     '#options' => $roles,
-    '#required' => TRUE,
+    '#required' => FALSE,  // permit no sitewide student roles when using organic groups...
   );
 
   $sel_roles = (array) variable_get('gradebook_teacher_rids', array());
@@ -170,7 +170,7 @@ function gradebook_admin_settings() {
     '#title' => t('Teacher roles'),
     '#default_value' => $default,
     '#options' => $roles,
-    '#required' => TRUE,
+    '#required' => FALSE,  // permit no sitewide teacher roles when using organic groups...
   );
 
   $form['general'] = array(
