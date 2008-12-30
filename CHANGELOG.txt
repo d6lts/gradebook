@@ -1,5 +1,12 @@
 /* $Id$ */
 
+Gradebook 6.x.1.x-dev, 2008-12-26
+----------------------
+- Fixed mistaken use of is_null() when !empty() should have been used.
+- Clarified documentation of students and teacher roles when using og_gradebook. 
+- Allow sitewide student and teacher roles to be optional so it works correctly with og_gradebook.
+- Added comments for gradebookapi.module
+
 Gradebook 6.x.1.x-dev, 2008-12-12
 ----------------------
 - Added embedded help via hook_help() in gradebook and gradebookapi
