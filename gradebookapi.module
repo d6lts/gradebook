@@ -28,12 +28,12 @@ function gradebookapi_menu() {
   $items = array();
 
     $items['admin/gradebook'] = array(
-      'title' => 'Gradebook',
+      'title'            => 'Gradebook',
       'description'      => 'Administer the suite of Gradebook modules.',
       'position'         => 'left',
       'weight'           => -5,
       'page callback'    => 'system_admin_menu_block_page',
-      'access arguments' => array('access administration pages'),
+      'access arguments' => array('administer site configuration'),
       'file'             => 'system.admin.inc',
       'file path'        => drupal_get_path('module', 'system'),
       );
@@ -353,8 +353,8 @@ function gradebookapi_set_grade($grade) {
     db_query("INSERT INTO {gradebookapi_grade} (uid, nid, earned, exempt, timestamp, note) VALUES (%d, %d, %d, %d, %d, '%s')", $grade->uid, $grade->nid, $grade->earned, $grade->exempt, $grade->timestamp, $grade->note);
     //gradebookapi_invoke_gradebookapi('insert', 'grade', $grade);
   }
-
-  $terms = taxonomy_node_get_terms_by_vocabulary($grade->nid, gradebookapi_get_vid());
+  $node = node_load($grade->nid);
+  $terms = taxonomy_node_get_terms_by_vocabulary($node, gradebookapi_get_vid());
   foreach ($terms as $term) {
     gradebookapi_calc_grades($grade->uid, $term->tid);
   }
@@ -621,6 +621,8 @@ function gradebookapi_assignment_insert($node) {
 
   // we have to manually update terms as we can't control module order
 
+  taxonomy_node_save($node, $node->taxonomy);
+
   gradebookapi_calc_assignment_grades($node);
 }
 
@@ -633,14 +635,29 @@ function gradebookapi_assignment_insert($node) {
  *    the assignment node
  *  @return NONE
  */
-function gradebookapi_assignment_update($node) {
-  db_query("UPDATE {gradebookapi_assignment} SET possible = '%s' WHERE nid = %d", $node->possible, $node->nid);
+function gradebookapi_assignment_update(&$node) {
+
+  if (db_result(db_query('SELECT * FROM {gradebookapi_assignment} a WHERE a.nid = %d', $node->nid))) {
+    db_query("UPDATE {gradebookapi_assignment} SET possible = '%s' WHERE nid = %d", $node->possible, $node->nid);
+  }
+  else { // assignment doesn't exist in gradebookapi_assignment table, so insert it
+    gradebookapi_assignment_insert($node);
+  }
 
   // we have to manually update terms as we can't control module order
 
-  taxonomy_node_save($node->nid, $node->taxonomy);
+  taxonomy_node_save($node, $node->taxonomy);
 
   gradebookapi_calc_assignment_grades($node);
+
+  // if the term has changed, calculate the clear the term grade for the previous term
+
+  $tax = $node->taxonomy;
+  $index = gradebookapi_get_vid();
+  if (isset($node->oldtid) && isset($tax[$index]) && $tax[$index] != $node->oldtid ) {
+      gradebookapi_calc_term_grades($node->oldtid);
+  }
+
 }
 
 /**
@@ -762,14 +779,6 @@ function gradebookapi_assignment_validate($node, $form = NULL) {
   // safe int check
   if (is_numeric($node->possible) ? intval($node->possible) != $node->possible : TRUE) {
     form_set_error('possible', t('The possible value for the assignment must be an integer.'));
-  }
-
-  // if the term has changed, clear the term grade for the previous term
-  $tax = $node->taxonomy;
-  $index = gradebookapi_get_vid();
-
-  if (isset($node->oldtid) && isset($tax[$index]) && $tax[$index] != $node->oldtid ) {
-    gradebookapi_clear_term_grades($node->oldtid);
   }
 }
 
