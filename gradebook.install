@@ -1,0 +1,26 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * gradebook.install: Install schema for gradebook
+ */
+
+// This module relies on gradebookapi and does not install any new database tables
+
+
+/**
+ * Implementation of hook_uninstall().
+ *   remove site-wide gradebooks
+ */
+
+function gradebook_uninstall() {
+
+  // Delete gradebook vocabulary, gradebooks, and gradebook category terms
+  // TODO:  track gradebooks created by this module and only delete those, leaving the vocabulary intact
+  //        Right now it doesn't matter, but this can be an issue if other gradebook modules that use
+  //        gradebookapi appear. og_gradebook relies on both gradebook and gradebookapi.
+
+  $vid = variable_get('gradebookapi_nav_vocabulary', '');
+  taxonomy_del_vocabulary($vid);
+}
