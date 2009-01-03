@@ -5,3 +5,10 @@ package = Gradebook
 dependencies[] = gradebookapi
 core = 6.x
 
+
+; Information added by drupal.org packaging script on 2008-12-20
+version = "6.x-2.x-dev"
+core = "6.x"
+project = "gradebook"
+datestamp = "1229774797"
+

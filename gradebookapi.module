@@ -17,7 +17,8 @@ function gradebookapi_perm() {
  */
 function gradebookapi_theme() {
   return array(
-    'gradebookapi_assignment_possible'  => array('arguments' => array('possible'))
+    'gradebookapi_assignment_possible'  => array('arguments' => array('possible')),
+    'gradebookapi_assignment_due_date' => array('arguments' => array('assignment')),
   );
 }
 
@@ -28,12 +29,13 @@ function gradebookapi_menu() {
   $items = array();
 
     $items['admin/gradebook'] = array(
-      'title' => 'Gradebook',
+      'title'            => 'Gradebook',
       'description'      => 'Administer the suite of Gradebook modules.',
       'position'         => 'left',
       'weight'           => -5,
       'page callback'    => 'system_admin_menu_block_page',
-      'access arguments' => array('access administration pages'),
+      'access callback'  => 'user_access',
+      'access arguments' => array('administer site configuration'),
       'file'             => 'system.admin.inc',
       'file path'        => drupal_get_path('module', 'system'),
       );
@@ -43,6 +45,7 @@ function gradebookapi_menu() {
       'description'      => 'Provides a gradebook API.',
       'page callback'    => 'drupal_get_form',
       'page arguments'   => array('gradebookapi_admin_settings'),
+      'access callback'  => 'user_access',
       'access arguments' => array('administer site configuration'),
       'file'             => 'gradebookapi.admin.inc',
       'type' => MENU_NORMAL_ITEM, // optional
@@ -67,7 +70,8 @@ function gradebookapi_help($path, $arg) {
 
 /**
  *  gradebookapi_get_assignment_types
- *  @return an array of content types that are used as gradebook assigments
+ *  @return 
+ *    an array of content types that are used as gradebook assigments
  */
 function gradebookapi_get_assignment_types() {
   $vid = gradebookapi_get_vid();
@@ -274,7 +278,7 @@ function gradebookapi_get_grade($uid, $nid) {
   // if no grade exists, return grade with possible value
   else {
     $result = db_query(
-      'SELECT a.possible '.
+      'SELECT a.possible, a.due_date, a.publish_date '.
       'FROM {gradebookapi_assignment} a '.
       'WHERE a.nid=%d', $nid);
     $grade = db_fetch_object($result);
@@ -305,7 +309,7 @@ function gradebookapi_get_grades($param = array()) {
   }
   $cond = implode(' AND ', $cond);
 
-  $result = db_query('SELECT g.uid, g.nid, g.earned, g.exempt, a.possible, g.timestamp, g.note FROM {gradebookapi_grade} g INNER JOIN {gradebookapi_assignment} a ON g.nid = a.nid WHERE '. $cond, $arguments);
+  $result = db_query('SELECT g.uid, g.nid, g.earned, g.exempt, a.possible, g.timestamp, g.note, a.due_date, a.publish_date FROM {gradebookapi_grade} g INNER JOIN {gradebookapi_assignment} a ON g.nid = a.nid WHERE '. $cond, $arguments);
   while ($grade = db_fetch_object($result)) {
     //gradebookapi_invoke_gradebookapi('load', 'grade', $grade);
     $grades[] = $grade;
@@ -353,8 +357,8 @@ function gradebookapi_set_grade($grade) {
     db_query("INSERT INTO {gradebookapi_grade} (uid, nid, earned, exempt, timestamp, note) VALUES (%d, %d, %d, %d, %d, '%s')", $grade->uid, $grade->nid, $grade->earned, $grade->exempt, $grade->timestamp, $grade->note);
     //gradebookapi_invoke_gradebookapi('insert', 'grade', $grade);
   }
-
-  $terms = taxonomy_node_get_terms_by_vocabulary($grade->nid, gradebookapi_get_vid());
+  $node = node_load($grade->nid);
+  $terms = taxonomy_node_get_terms_by_vocabulary($node, gradebookapi_get_vid());
   foreach ($terms as $term) {
     gradebookapi_calc_grades($grade->uid, $term->tid);
   }
@@ -603,7 +607,7 @@ function gradebookapi_assignment_terms($node) {
  *    an array of form default values
  */
 function gradebookapi_assignment_load($node) {
-  $additions = db_fetch_array(db_query('SELECT possible FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid));
+  $additions = db_fetch_array(db_query('SELECT possible, publish_date, due_date FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid));
   return $additions;
 }
 
@@ -617,9 +621,22 @@ function gradebookapi_assignment_load($node) {
  *  @return NONE
  */
 function gradebookapi_assignment_insert($node) {
-  db_query("INSERT INTO {gradebookapi_assignment} (nid, possible) VALUES (%d, %d)", $node->nid, $node->possible);
+  $node->publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
+  $node->due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
+
+  $now = $_SERVER['REQUEST_TIME'];
+  if ($now > $node->publish_date) {
+    $node->status = 1;
+  }
+  else {
+    $node->status = 0;
+  }
+
+  db_query("INSERT INTO {gradebookapi_assignment} (nid, possible, publish_date, due_date) VALUES (%d, %d, '%d', '%d')", $node->nid, $node->possible, $node->publish_date, $node->due_date);
 
   // we have to manually update terms as we can't control module order
+
+  taxonomy_node_save($node, $node->taxonomy);
 
   gradebookapi_calc_assignment_grades($node);
 }
@@ -633,14 +650,30 @@ function gradebookapi_assignment_insert($node) {
  *    the assignment node
  *  @return NONE
  */
-function gradebookapi_assignment_update($node) {
-  db_query("UPDATE {gradebookapi_assignment} SET possible = '%s' WHERE nid = %d", $node->possible, $node->nid);
+function gradebookapi_assignment_update(&$node) {
+  $node->publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
+  $node->due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
+
+  if (db_result(db_query('SELECT * FROM {gradebookapi_assignment} a WHERE a.nid = %d', $node->nid))) {
+    db_query("UPDATE {gradebookapi_assignment} SET possible = '%s', publish_date = '%d', due_date = '%d'  WHERE nid = %d", $node->possible, $node->publish_date, $node->due_date, $node->nid); 
+  }
+  else { // assignment doesn't exist in gradebookapi_assignment table, so insert it
+    gradebookapi_assignment_insert($node);
+  }
 
   // we have to manually update terms as we can't control module order
 
-  taxonomy_node_save($node->nid, $node->taxonomy);
+  taxonomy_node_save($node, $node->taxonomy);
 
   gradebookapi_calc_assignment_grades($node);
+
+  //if the term has changed, clear the term grade for the previous term
+
+  $tax = $node->taxonomy;
+  $index = gradebookapi_get_vid();
+  if (isset($node->oldtid) && isset($tax[$index]) && $tax[$index] != $node->oldtid ) {
+      gradebookapi_calc_term_grades($node->oldtid);
+  }
 }
 
 /**
@@ -650,7 +683,8 @@ function gradebookapi_assignment_update($node) {
  *    Called via hook_nodeapi (delete).
  *  @param $node
  *    the assignment node
- *  @return NONE
+ *  @return
+ *    NONE
  */
 function gradebookapi_assignment_delete($node) {
   db_query('DELETE FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid);
@@ -684,10 +718,13 @@ function gradebookapi_assignment_delete($node) {
  *  @return NONE
  */
 function gradebookapi_assignment_view(&$node, $teaser = FALSE, $page = FALSE) {
-
   $node = node_prepare($node, $teaser);
   $node->content['possible'] = array(
     '#value' => theme('gradebookapi_assignment_possible', $node->possible),
+    '#weight' => -100,
+  );
+  $node->content['due_date'] = array(
+    '#value' => theme('gradebookapi_assignment_due_date', $node->due_date),
     '#weight' => -100,
   );
 
@@ -696,14 +733,17 @@ function gradebookapi_assignment_view(&$node, $teaser = FALSE, $page = FALSE) {
 
 /**
  *  Theme the assignment_possible field
+ * 
+ *  @param $possible
+ *    The possible number of points for the assignment
+ *  @return
+ *    The HTML string ready to display
  */
 function theme_gradebookapi_assignment_possible($possible) {
-  $header = array();
-  $row = array();
-  $row[]=  array(t('<strong>Possible</strong>'), $possible);
-
-  return theme('table', $header, $row);
-
+  $output = '<div class="gradebook-assignment-possible">'. t('Possible') .': ';
+  $output .= '<span class="gradebook-assignment-possible-points">'. $possible .'</span>';
+  $output .= '</div>';
+  return $output;
 }
 
 /**
@@ -722,6 +762,7 @@ function gradebookapi_assignment_form_elements($node) {
     '#type' => 'fieldset',
     '#title' => t('Assignment Settings'),
     '#tree' => FALSE,
+    '#weight' => 0,
     //'#validate' => array('gradebookapi_assignment_validate' => array()),
   );
   $form['gradebookapi']['possible'] = array(
@@ -732,6 +773,38 @@ function gradebookapi_assignment_form_elements($node) {
     '#maxlength' => 10,
     '#required' => TRUE,
   );
+
+  if ($node->due_date == NULL) {
+    $node->due_date = strtotime(variable_get('gradebookapi_assignments_interval', '+1 month'));
+  }
+
+  if ($node->publish_date == NULL) {
+    $node->publish_date = time();
+  }
+
+  $form['gradebookapi']['dates'] = array(
+    '#type' => 'fieldset',
+    '#collapsible' => FALSE,
+    '#title' => t('Assignment dates'),
+    '#weight' => -8,
+    );
+
+  $form['gradebookapi']['dates']['due_date'] = array(
+    '#prefix' => '<div class="date_widget">',
+    '#suffix' => '</div>',
+    '#type' => 'date',
+    '#title' => t('Assignment due date'),
+    '#default_value' => is_array($node->due_date) ? $node->due_date : _gradebookapi_unixtime2drupaldate($node->due_date),
+    );
+
+  $form['gradebookapi']['dates']['publish_date'] = array(
+    '#prefix' => '<div class="date_widget">',
+    '#suffix' => '</div>',    
+    '#type' => 'date',
+    '#title' => t('Publish date'),
+    '#default_value' => is_array($node->publish_date) ? $node->publish_date : _gradebookapi_unixtime2drupaldate($node->publish_date),
+    );
+  $form['#submit'][] = 'gradebookapi_assignment_submit';
 
   $oldtax = $node->taxonomy;
   if (is_array($oldtax)) {  // an array of terms
@@ -759,17 +832,39 @@ function gradebookapi_assignment_form_elements($node) {
  *  @return NONE
  */
 function gradebookapi_assignment_validate($node, $form = NULL) {
-  // safe int check
-  if (is_numeric($node->possible) ? intval($node->possible) != $node->possible : TRUE) {
-    form_set_error('possible', t('The possible value for the assignment must be an integer.'));
+  if ($node) {
+    // safe int check
+    if (is_numeric($node->possible) ? intval($node->possible) != $node->possible : TRUE) {
+      form_set_error('possible', t('The possible value for the assignment must be an integer.'));
+    }
+    $due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
+    $publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
+    if ($publish_date >= $due_date) {
+      form_set_error('publish_date', t('The publish date of an assignment must be before its due date.'));
+    }
   }
+}
 
-  // if the term has changed, clear the term grade for the previous term
-  $tax = $node->taxonomy;
-  $index = gradebookapi_get_vid();
+/**
+ * Implementation of hook_submit().
+ * This checks if the assignment should be marked as published.
+ */
+function gradebookapi_assignment_submit($form, &$form_state) {
 
-  if (isset($node->oldtid) && isset($tax[$index]) && $tax[$index] != $node->oldtid ) {
-    gradebookapi_clear_term_grades($node->oldtid);
+  $publish_date = _gradebookapi_drupaldate2unixtime($form_state['values']['publish_date']);
+  $due_date = _gradebookapi_drupaldate2unixtime($form_state['values']['due_date']);
+
+  $now = $_SERVER['REQUEST_TIME'];
+  //print 'now ' .$now;
+  //print 'due ' .$due_date;
+  //print 'publish ' .$publish_date;
+
+  $form_state['values']['status'] = ($now >= $publish_date);
+  if ($form_state['values']['status']) {
+    drupal_set_message(t('The assignment is currently active.'));
+  }
+  else {
+    drupal_set_message(t('The assignment will become active on !date.', array('!date' => format_date($publish_date, 'small'))));
   }
 }
 
@@ -780,6 +875,8 @@ function gradebookapi_assignment_validate($node, $form = NULL) {
  */
 function gradebookapi_form_alter(&$form, $form_state, $form_id) {
   if (isset($form['type']) && $form['type']['#value'] .'_node_form' == $form_id) {
+
+//    print_r($form);
     $node = $form['#node'];
     $types = gradebookapi_get_assignment_types();
 
@@ -797,7 +894,6 @@ function gradebookapi_form_alter(&$form, $form_state, $form_id) {
  *
  * @return NONE
  */
-
 function gradebookapi_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
   if (in_array($node->type, (array)gradebookapi_get_assignment_types())) {
     switch ($op) {
@@ -934,4 +1030,88 @@ function gradebookapi_get_students($gradebook) {
  */
 function gradebookapi_get_teachers($gradebook) {
   return module_invoke_all('gradebookapi_teachers', $gradebook);
+}
+
+/**
+ *  These date functions are copied and adapted from the announcements module
+ *  TODO: document these functions
+ */
+
+
+/**
+ * Implementation of hook_cron().
+ *
+ * This function allows gradebookapi to insert its own actions when
+ * the cron.php script is run  usually by the system cron system. This is useful
+ * when performing periodic asynchronous tasks like, as in this case, checking to
+ * see if any assignments should be published.
+ *
+ * @return
+ *   Nothing.
+ *
+ * More detail at @link http://api.drupal.org/api/HEAD/function/hook_cron API page @endlink .
+ */
+function gradebookapi_cron() {
+
+  $types = (array)gradebookapi_get_assignment_types();
+
+  // Mark ready assignments as published.
+  $sql = "UPDATE {node} SET status = 1 WHERE type IN ('. implode(',', $types) .') AND status = 0 AND nid IN (SELECT nid FROM {gradebookapi_assignment} WHERE publish_date <= %d)";
+
+  $query_result = db_query($sql, $_SERVER['REQUEST_TIME']);
+}
+
+
+/**
+ *
+ */
+function _gradebookapi_assignment_status(&$node) {
+  $node->publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
+  $node->due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
+
+  $now = $_SERVER['REQUEST_TIME'];
+  if ($now > $node->publish_date) {
+    $node->status = 1;
+  }
+  else {
+    $node->status = 0;
+  }
+}
+
+function _gradebookapi_get_timezone() {
+  global $user;
+  if (variable_get('configurable_timezones', 1) && $user->uid && strlen($user->timezone)) {
+    // User has his/her own timezone, use that.
+    return $user->timezone;
+  }
+  return variable_get('date_default_timezone', 0);
+}
+
+function _gradebookapi_drupaldate2unixtime($drupal_date) {
+  // Compute the time in UTC (GMT).
+  $tz_seconds = _gradebookapi_get_timezone();
+  return gmmktime(0, 0, 0, (int)$drupal_date["month"], (int)$drupal_date["day"], (int)$drupal_date["year"]) - $tz_seconds;
+}
+
+function _gradebookapi_unixtime2drupaldate($unixtime) {
+  $unixtime -= _gradebookapi_get_timezone;
+  return array('day' => gmdate('j', $unixtime),
+    'month' => gmdate('n', $unixtime),
+    'year' => gmdate('Y', $unixtime));
+}
+
+/**
+ * Theme the assignment due date.
+ *
+ * @param $due_date
+ *   The date array.
+ *
+ * @return
+ *   The HTML string ready to display/
+ */
+function theme_gradebookapi_assignment_due_date($due_date) {
+  $output = '<div class="gradebook-assignment-due">'. t('Assignment is due on') .' ';
+  $output .= '<span class="gradebook-assignment-due-date">'. format_date($due_date, 'custom', 'F j, Y') .'</span>';
+  $output .= '</div>';
+  return $output;
 }

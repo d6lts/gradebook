@@ -24,6 +24,28 @@ function gradebookapi_admin_settings() {
     '#description' => t('A list of node types you want to treat as assignments.'),
   );
 
+  $intervals = array(
+    '+1 day' => t('1 day'),
+    '+1 week' => t('1 week'),
+    '+2 week' => t('2 weeks'),
+    '+1 month' => t('1 month'),
+    '+2 month' => t('2 months'),
+    '+3 month' => t('3 months'),
+    '+6 month' => t('6 months'),
+    '+1 year' => t('1 year'),
+    );
+
+  $form['gradebookapi_assignments_interval'] = array(
+    '#type' => 'radios',
+    '#options' => $intervals,
+    '#title' => t('Default time between creation of assignment node and due date'),
+    '#default_value' => variable_get('gradebookapi_assignments_interval', '+1 month'),
+    '#description' => t('This will be added to the current date to set the default due date.'),
+    '#required' => FALSE,
+    '#prefix' => '<div class="gradebookapi-radios">',
+    '#suffix' => '</div><div class="clear-block"></div>',
+    );
+
   return system_settings_form($form);
 }
 

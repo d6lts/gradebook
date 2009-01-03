@@ -16,3 +16,30 @@ width: 100%;
 overflow-y: scroll;
 overflow-x: scroll;
 }
+
+.gradebook-assignment-due {
+  font-size: 89%;
+  font-style: italic;
+  text-align: left;
+  margin: 1.5 em 0 0 2em;
+  padding: 10px 10px;
+  color: #FF0000;
+
+}
+.gradebook-assignment-due-date {
+  color: #FF0000;
+}
+
+.gradebook-assignment-possible {
+  font-size: 89%;
+  font-style: italic;
+  text-align: left;
+  padding-left: 10px;
+  padding-bottom: 10px;
+  margin: 1.5 em 0 0 2em;
+  color: #FF0000;
+}
+
+.gradebook-assignment-possible-points {
+  color: #FF0000;
+}

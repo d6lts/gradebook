@@ -57,9 +57,37 @@ function gradebookapi_install() {
  * Implementation of hook_uninstall().
  */
 function gradebookapi_uninstall() {
+
+  // All gradebook UI modules should delete their taxonomy trees
+
   // Remove tables.
+
   drupal_uninstall_schema('gradebookapi');
 
   // Delete all variables.
   db_query("DELETE FROM {variable} WHERE name LIKE 'gradebookapi_%%'");
+}
+
+/**
+ * Add Date support to gradebookapi.
+ */
+function gradebookapi_update_6001() {
+  $ret = array();
+  db_add_field($ret, 'gradebookapi_assignment', 'publish_date' => array(
+        'description' => 'Date assignment becomes effective.',
+        'type' => 'int',
+        'unsigned' => FALSE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+        ));
+  db_add_field($ret, 'gradebookapi_assignment', 'due_date' => array(
+        'description' => 'Date assignment is due.',
+        'type' => 'int',
+        'unsigned' => FALSE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+        ));
+  return $ret;
 }

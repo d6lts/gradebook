@@ -1,11 +1,22 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-01-01
+----------------------
+- Fixed several incorrect arguments to taxonomy functions (changed between Drupal v5 and v6).
+- Added a check in gradebookapi_assignment_update to make sure table has a record of the assignment. 
+- Adjusted access arguments for admin/gradebook.
+- Relocated code to calculate term grade when an assignment changes categories.
+
+Gradebook 6.x.2.x-dev, 2008-12-30
+----------------------
+- Created a 6.x.2.x new features branch 
+- Added date support for assignments by modifying code from the announcement module
+
 Gradebook 6.x.1.x-dev, 2008-12-26
 ----------------------
 - Fixed mistaken use of is_null() when !empty() should have been used.
 - Clarified documentation of students and teacher roles when using og_gradebook. 
 - Allow sitewide student and teacher roles to be optional so it works correctly with og_gradebook.
-- Added comments for gradebookapi.module
 
 Gradebook 6.x.1.x-dev, 2008-12-12
 ----------------------

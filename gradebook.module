@@ -524,12 +524,17 @@ function gradebook_gradebook_page($gradebook, $uid = NULL) {
         $assignments[] = node_load($assignment->nid);
       }
       break;
-    case 'date':
-      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'n.created '. $sort);
+    case 'due':
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'a.due_date '. $sort);
       while ($assignment = db_fetch_object($result)) {
         $assignments[] = node_load($assignment->nid);
       }
       break;
+    case 'publish':
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'a.publish_date '. $sort);
+      while ($assignment = db_fetch_object($result)) {
+        $assignments[] = node_load($assignment->nid);
+      }
       break;
     case 'possible':
       $values = array();
@@ -584,12 +589,14 @@ function theme_gradebook_page($gradebook, $assignments, $student_grades) {
     'category' => array(l('category', 'gradebook/'. $gradebook->tid, array('query' => 'order=category&sort='. $sort))),
 //    'average' => array(l('class avg', 'gradebook/'. $gradebook->tid, array('query' => 'order=average&sort=asc'))),
     'possible' => array(l('possible', 'gradebook/'. $gradebook->tid, array('query' => 'order=possible&sort='. $sort))),
-    'date' => array(l('date', 'gradebook/'. $gradebook->tid, array('query' => 'order=date&sort='. $sort))),
+    'due' => array(l('due date', 'gradebook/'. $gradebook->tid, array('query' => 'order=due&sort='. $sort))),
+    'publish' => array(l('published', 'gradebook/'. $gradebook->tid, array('query' => 'order=publish&sort='. $sort))),
     'title' => array(l('title', 'gradebook/'. $gradebook->tid, array('query' => 'order=title&sort='. $sort))),
   );
     $headers['category'][] = array('data' => 'Overall');
     $headers['possible'][] = array('');
-    $headers['date'][]     = array('');
+    $headers['publish'][]     = array('');
+    $headers['due'][]     = array('');
     $headers['title'][]    = array('');
 
   $rows = array();
@@ -615,7 +622,8 @@ function theme_gradebook_page($gradebook, $assignments, $student_grades) {
     }
     $headers['category'][] = array('data' => $category, 'class' => 'assignment_category');
     $headers['possible'][] = array('data' => $assignment->possible, 'class' => 'assignment_possible');
-    $headers['date'][]     = array('data' => format_date($assignment->created, 'custom', 'Y/m/d'), 'class' => 'assignment_date');
+    $headers['publish'][]     = array('data' => format_date($assignment->publish_date, 'custom', 'Y/m/d'), 'class' => 'assignment_date');
+    $headers['due'][]     = array('data' => format_date($assignment->due_date, 'custom', 'Y/m/d'), 'class' => 'assignment_date');
     $headers['title'][]    = array('data' => l($assignment->title, 'node/'. $assignment->nid), 'class' => 'assignment_title');
   }
 //  $avg = array();

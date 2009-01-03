@@ -35,6 +35,11 @@ function gradebook_add_page() {
   return drupal_get_form('gradebook_gradebook_form');
 }
 
+/**
+ *  gradebook_edit_page is largely borrowed from the core taxonomy.admin.inc file
+ *
+ */
+
 function gradebook_edit_page($tid=-1) {
   // TODO: check to make sure gradebook tid is valid
 
