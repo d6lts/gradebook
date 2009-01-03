@@ -15,6 +15,22 @@ function gradebookapi_schema() {
     'fields' => array(
       'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'possible'    => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'publish_date' => array(
+        'description' => 'Date assignment becomes effective.',
+        'type' => 'int',
+        'unsigned' => FALSE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
+      'due_date' => array(
+        'description' => 'Date assignment is due.',
+        'type' => 'int',
+        'unsigned' => FALSE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-width' => '10',
+      ),
     ),
     'primary key' => array('nid'),
   );
@@ -73,7 +89,7 @@ function gradebookapi_uninstall() {
  */
 function gradebookapi_update_6001() {
   $ret = array();
-  db_add_field($ret, 'gradebookapi_assignment', 'publish_date' => array(
+  db_add_field($ret, 'gradebookapi_assignment', 'publish_date', array(
         'description' => 'Date assignment becomes effective.',
         'type' => 'int',
         'unsigned' => FALSE,
@@ -81,7 +97,7 @@ function gradebookapi_update_6001() {
         'default' => 0,
         'disp-width' => '10',
         ));
-  db_add_field($ret, 'gradebookapi_assignment', 'due_date' => array(
+  db_add_field($ret, 'gradebookapi_assignment', 'due_date', array(
         'description' => 'Date assignment is due.',
         'type' => 'int',
         'unsigned' => FALSE,
