@@ -285,7 +285,6 @@ function gradebookapi_get_grade($uid, $nid) {
     $grade->uid = $uid;
     $grade->nid = $nid;
 
-    //gradebookapi_invoke_gradebookapi('load', 'grade', $grade);
     return $grade;
   }
 
@@ -311,7 +310,6 @@ function gradebookapi_get_grades($param = array()) {
 
   $result = db_query('SELECT g.uid, g.nid, g.earned, g.exempt, a.possible, g.timestamp, g.note, a.due_date, a.publish_date FROM {gradebookapi_grade} g INNER JOIN {gradebookapi_assignment} a ON g.nid = a.nid WHERE '. $cond, $arguments);
   while ($grade = db_fetch_object($result)) {
-    //gradebookapi_invoke_gradebookapi('load', 'grade', $grade);
     $grades[] = $grade;
   }
 
@@ -333,8 +331,6 @@ function gradebookapi_get_term_grade($uid, $tid) {
   $result = db_query("SELECT uid, tid, earned, possible FROM {gradebookapi_cache} WHERE tid=%d AND uid=%d", $tid, $uid);
   $grade = db_fetch_object($result);
 
-  //gradebookapi_invoke_gradebookapi('load', 'grade', $grade);
-
   return $grade;
 }
 
@@ -351,11 +347,11 @@ function gradebookapi_set_grade($grade) {
   $grade->timestamp = time();
   if ($old->timestamp) {
     db_query("UPDATE {gradebookapi_grade} SET earned=%d, exempt=%d, timestamp=%d, note='%s' WHERE uid=%d AND nid=%d", $grade->earned, $grade->exempt, $grade->timestamp, $grade->note, $grade->uid, $grade->nid);
-    //gradebookapi_invoke_gradebookapi('update', 'grade', $grade);
+
   }
   else {
     db_query("INSERT INTO {gradebookapi_grade} (uid, nid, earned, exempt, timestamp, note) VALUES (%d, %d, %d, %d, %d, '%s')", $grade->uid, $grade->nid, $grade->earned, $grade->exempt, $grade->timestamp, $grade->note);
-    //gradebookapi_invoke_gradebookapi('insert', 'grade', $grade);
+
   }
   $node = node_load($grade->nid);
   $terms = taxonomy_node_get_terms_by_vocabulary($node, gradebookapi_get_vid());
@@ -624,7 +620,7 @@ function gradebookapi_assignment_insert($node) {
   $node->publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
   $node->due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
 
-  $now = $_SERVER['REQUEST_TIME'];
+  $now = time();
   if ($now > $node->publish_date) {
     $node->status = 1;
   }
@@ -854,10 +850,7 @@ function gradebookapi_assignment_submit($form, &$form_state) {
   $publish_date = _gradebookapi_drupaldate2unixtime($form_state['values']['publish_date']);
   $due_date = _gradebookapi_drupaldate2unixtime($form_state['values']['due_date']);
 
-  $now = $_SERVER['REQUEST_TIME'];
-  //print 'now ' .$now;
-  //print 'due ' .$due_date;
-  //print 'publish ' .$publish_date;
+  $now = time();
 
   $form_state['values']['status'] = ($now >= $publish_date);
   if ($form_state['values']['status']) {
@@ -1052,13 +1045,14 @@ function gradebookapi_get_teachers($gradebook) {
  * More detail at @link http://api.drupal.org/api/HEAD/function/hook_cron API page @endlink .
  */
 function gradebookapi_cron() {
-
   $types = (array)gradebookapi_get_assignment_types();
 
   // Mark ready assignments as published.
-  $sql = "UPDATE {node} SET status = 1 WHERE type IN ('. implode(',', $types) .') AND status = 0 AND nid IN (SELECT nid FROM {gradebookapi_assignment} WHERE publish_date <= %d)";
+  $sql = "UPDATE {node} SET status = 1 WHERE type IN ( '". implode("', '", $types) ."') AND status = 0 AND nid IN (SELECT nid FROM {gradebookapi_assignment} WHERE publish_date <= %d)";
+  $the_time = time();
+  $query_result = db_query($sql, $the_time);
+  //watchdog('gradebookapi', 'Checking assignment status using %sql at timestamp %time, returned %res.', array('%res' => $query_result, '%time' => $the_time, '%sql' => $sql), WATCHDOG_INFO);
 
-  $query_result = db_query($sql, $_SERVER['REQUEST_TIME']);
 }
 
 
@@ -1069,7 +1063,7 @@ function _gradebookapi_assignment_status(&$node) {
   $node->publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
   $node->due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
 
-  $now = $_SERVER['REQUEST_TIME'];
+  $now = time();
   if ($now > $node->publish_date) {
     $node->status = 1;
   }

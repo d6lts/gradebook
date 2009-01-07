@@ -1,43 +1,98 @@
 /* $Id$ */
-.gradebook .category {
-  text-align: left;
-  padding-right: 1em;
-  border-right: 3px solid #ccc;
-  border-bottom: none;
-  background: #F0F0F0;
+
+/**
+ * @file
+ * CSS rules for formating the gradebook
+ */
+
+/**
+ *  This container surrounds the gradebook_page.
+ *  Adds scrollbars to keep table under control.
+ */
+
+#gradebook-container {
+  overflow-x: scroll;
+  overflow-y: scroll;
 }
 
-.gradebook  .exempt, .gradebook  .exempt a {
+/**
+ *  Rules to format the gradebook table 
+ */
+
+.gradebook {
+  width: 100%;
+  font-size: 70%;
+  border: 1px solid #ccc;
+}
+
+/**
+ *  Rules for formatting gradebook table header rows and columns
+ */
+
+.gradebook th,
+.gradebook .category,
+.gradebook .possible,
+.gradebook .date,
+.gradebook .title,
+.gradebook .edit-all {
+  border: 2px solid #ccc;
+  text-align: center;
+}
+
+.gradebook .average {
+  border: 2px solid #ccc;
+  color: #FF0000;
+  text-align: center;
+}
+
+/**
+ * Rules for formating gradebook table grade entries
+ */
+
+.gradebook .grade {
+  text-align: center;
+}
+
+.gradebook .term_grade {
+  text-align: center;
+  border-bottom: 1px solid #000000;
+  color: #FF0000;
+}
+
+/**
+ *  Rules to provide line through exempted grade
+ */
+
+.gradebook  .exempt,
+.gradebook  .exempt a {
   text-decoration: line-through;
   color: #AA0000;
 }
-.gradebook-showgrades {
-width: 100%;
-overflow-y: scroll;
-overflow-x: scroll;
-}
+
+/**
+ *  Rules to format the extra fields added to assignment nodes.
+ */
 
 .gradebook-assignment-due {
+  color: #FF0000;
   font-size: 89%;
   font-style: italic;
+  padding-left: 1.5em;
+  padding-bottom: 1.5em;
   text-align: left;
-  margin: 1.5 em 0 0 2em;
-  padding: 10px 10px;
-  color: #FF0000;
-
 }
+
 .gradebook-assignment-due-date {
   color: #FF0000;
 }
 
 .gradebook-assignment-possible {
+  color: #FF0000;
   font-size: 89%;
   font-style: italic;
+  padding-top: 1.5em;
+  padding-left: 1.5em;
   text-align: left;
-  padding-left: 10px;
-  padding-bottom: 10px;
-  margin: 1.5 em 0 0 2em;
-  color: #FF0000;
 }
 
 .gradebook-assignment-possible-points {

@@ -1,5 +1,15 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-01-05
+----------------------
+- Added two forms to improve UI: 
+-   * grade all students for a select assignment, and grade all assignments for a selected student
+- Added div ID's for form elements to permit form layout through CSS (not yet implemented in gradebook.css)
+- split off page callbacks into either gradebook.pages.inc (display/edit grade) or gradebook.category.inc
+  or gradebook.category.inc (gradebook categories) to reduce size of gradebook.module
+- reworked theme_gradebook_page and gradebook.css to improve css control of formating on gradebook_page
+- Added assignment class average row to gradebook_page
+
 Gradebook 6.x.2.x-dev, 2009-01-01
 ----------------------
 - Fixed several incorrect arguments to taxonomy functions (changed between Drupal v5 and v6).
