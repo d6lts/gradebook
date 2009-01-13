@@ -1,5 +1,9 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-01-13
+----------------------
+- #358236 by MGN: incorrect use of url() in form redirect.
+
 Gradebook 6.x.2.x-dev, 2009-01-05
 ----------------------
 - Added two forms to improve UI: 

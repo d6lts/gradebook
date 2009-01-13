@@ -100,7 +100,7 @@ function gradebook_grade_form($form_state, $gradebook, $account, $node, $edit = 
 
   $form['return_url'] = array(
    '#type' => 'hidden',
-   '#value' => url('gradebook/'. $gradebook->tid),
+   '#value' => 'gradebook/'. $gradebook->tid,
   );
 
   $form['submit'] = array(
@@ -251,7 +251,7 @@ function gradebook_grade_assignment_form($form_state, $gradebook, $node, $edit=a
   }
 
   $form['nid'] = array( '#type' => 'hidden', '#value' => $node->nid);
-  $form['return_url'] = array( '#type' => 'hidden', '#value' => url('gradebook/'. $gradebook->tid));
+  $form['return_url'] = array( '#type' => 'hidden', '#value' => 'gradebook/'. $gradebook->tid);
 
   $form['submit'] = array(
     '#type' => 'submit',
@@ -418,7 +418,7 @@ function gradebook_grade_student_form($form_state, $gradebook, $account, $edit=a
   }
 
   $form['uid'] = array( '#type' => 'hidden', '#value' => $account->uid);
-  $form['return_url'] = array( '#type' => 'hidden', '#value' => url('gradebook/'. $gradebook->tid));
+  $form['return_url'] = array( '#type' => 'hidden', '#value' => 'gradebook/'. $gradebook->tid);
 
   $form['submit'] = array(
     '#type' => 'submit',
