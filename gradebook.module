@@ -932,7 +932,7 @@ function gradebook_grade_form($form_state, $gradebook, $account, $node, $edit=ar
 
   $form['return_url'] = array(
    '#type' => 'hidden',
-   '#value' => url('gradebook/'. $gradebook->tid),
+   '#value' => 'gradebook/'. $gradebook->tid,
   );
 
   $form['submit'] = array(
