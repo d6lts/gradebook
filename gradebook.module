@@ -220,28 +220,7 @@ function gradebook_help($path, $arg) {
  */
 
 function gradebook_gradebookapi_students($gradebook) {
-  $students = array();
-
-  $roles = user_roles();
-  unset($roles[DRUPAL_ANONYMOUS_RID]);
-  unset($roles[DRUPAL_AUTHENTICATED_RID]);
-
-  $sel_roles = (array) variable_get('gradebook_student_rids', array());
-
-  foreach ($sel_roles as $rid => $value) {
-    if (!$value) {
-      unset($roles[$rid]);
-    }
-  }
-  if (count($roles)) {
-    if ($str_rids = implode(',', array_keys($roles)) ) {
-      $result = db_query("SELECT u.uid FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status <> 0 AND r.rid IN (". $str_rids .")");
-      while ($user = db_fetch_object($result)) {
-        $students[$user->uid] = $user->uid;
-      }
-    }
-  }
-  return $students;
+  return _gradebook_gradebookapi_role($gradebook, 'student');
 }
 
 /**
@@ -254,29 +233,36 @@ function gradebook_gradebookapi_students($gradebook) {
  */
 
 function gradebook_gradebookapi_teachers($gradebook) {
-  $teachers = array();
+  return _gradebook_gradebookapi_role($gradebook, 'teacher');
+}
 
-  $roles = user_roles();
-  unset($roles[DRUPAL_ANONYMOUS_RID]);
-  unset($roles[DRUPAL_AUTHENTICATED_RID]);
+/**
+ * Helper function for hook_gradebookapi_teachers and hook_gradebokapi_students
+ * to avoid code duplication.
+ * @param $gradebook
+ *   The gradebook object
+ * @param $role_name
+ *   Role name to get user ids for, must be either 'student' or 'teacher'
+ * @return array
+ *   An array of user ids corresponding to $role_name
+ */
 
-  $sel_roles = (array) variable_get('gradebook_teacher_rids', array());
-  foreach ($sel_roles as $rid => $value) {
-    if (!$value) {
-      unset($roles[$rid]);
-    }
-  }
+function _gradebook_gradebookapi_role($gradebook, $role_name) {
+  $role = array();
 
-  if (count($roles)) {
-    if ($str_rids = implode(',', array_keys($roles)) ) {
-      $result = db_query("SELECT u.uid FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status <> 0 AND r.rid IN (". $str_rids .")");
-      while ($user = db_fetch_object($result)) {
-        $teachers[$user->uid] = $user->uid;
+  if ( $role_name == 'teacher' || $role_name == 'student' ) {
+    $var = 'gradebook_'. $role_name .'_rids';
+    $sel_roles = array_filter((array)variable_get($var, array()));
+    if (count($sel_roles)) {
+      if ($str_rids = implode(',', $sel_roles)) {
+        $result = db_query("SELECT u.uid FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status <> 0 AND r.rid IN (". $str_rids .")");
+        while ($user = db_fetch_object($result)) {
+          $role[$user->uid] = $user->uid;
+        }
       }
     }
   }
-
-  return $teachers;
+  return $role;
 }
 
 /**
