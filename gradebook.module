@@ -9,7 +9,7 @@
  * Implementation of hook_perm().
  */
 function gradebook_perm() {
-  return array('admin gradebook');
+  return array('admin gradebook', 'access gradebook');
 }
 
 /**
@@ -49,7 +49,7 @@ function gradebook_menu() {
     'title' => 'Gradebooks',
     'page callback'    => 'gradebook_list_page',
     'access callback'  => 'user_access',
-    'access arguments' => array('access content'),
+    'access arguments' => array('access gradebook'),
     'type'             => MENU_SUGGESTED_ITEM,
   );
 
@@ -106,7 +106,7 @@ function gradebook_menu() {
     'page callback'      => 'gradebook_gradebook_page',
     'page arguments'     => array(1, 2),              // optional path element specifies user id
     'access callback'    => 'user_access',
-    'access arguments'   => array('access content'),
+    'access arguments'   => array('access gradebook'),
     'type'               => MENU_LOCAL_TASK,
   );
   $items['gradebook/%gradebookapi_gradebook/view'] = array(
