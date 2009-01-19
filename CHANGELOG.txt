@@ -1,5 +1,19 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-01-18
+----------------------
+- #360407 by MGN: added export gradebook feature, borrowing heavily from the webform module. This 
+  adds a menu local item to export the gradebook to Excel or text file. Most of the new code is in
+  two include file gradebook_report.inc and gradebook_export.inc. To avoid code duplication,
+  gradebook_gradebook_page() was modified to return rows for a text table when called with
+  the argument $export = TRUE.  
+
+Gradebook 6.x.2.x-dev, 2009-01-17
+----------------------
+- rewrote hook_gradebookapi_teachers and hook_gradebookapi_students so creating a new drupal role does 
+  not automatically give it teacher and student status. Also separated out common code into a helper 
+  function _gradebook_gradebookapi_role to avoid code duplication.
+
 Gradebook 6.x.2.x-dev, 2009-01-13
 ----------------------
 - #358236 by MGN: incorrect use of url() in form redirect.

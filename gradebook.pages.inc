@@ -21,6 +21,7 @@
 
 function gradebook_grade_page($gradebook, $uid, $nid) {
   $account = user_load(array('uid' => $uid));
+
   if ($account !== FALSE && gradebookapi_is_student($gradebook, $account)) {
     $types = gradebookapi_get_assignment_types();
     $node = node_load($nid);
@@ -163,21 +164,25 @@ function theme_gradebook_assignment_note($tid, $account, $node, $grade) {
 
 function gradebook_grade_assignment_page($gradebook, $nid) {  // only accessed by teacher
   $types = gradebookapi_get_assignment_types();
-  $node = node_load($nid);  
+  $node = node_load($nid);
   if (in_array($node->type, $types)) {
-  //  $param = array('a.nid' => $nid);
-  //  $grades = gradebookapi_get_grades($param);  // get all student grades for this assignment
-  // check if g.nid exists, if so, do the select, if not make up an empty grade object
+    $grades = array();
+    $students = array();
+
+    $students = gradebookapi_get_students($gradebook);
     $sql = 'SELECT uid, nid, earned, exempt, timestamp, note FROM {gradebookapi_grade} WHERE nid = %d';
     $result = db_query($sql, $nid);
-    $grades = array();
     while ($grade = db_fetch_object($result)) {
-      $grades[$grade->uid] = (array)$grade;
+      // do not load grades that exist in the database for students that are no longer active students...
+      // TODO: When a user account is deleted, remove grades after giving opportunity to archive
+      if (in_array($grade->uid, $students)) {   // grade is for an active student
+        $grades[$grade->uid] = (array)$grade;
+      }
     }
-    $students = gradebookapi_get_students($gradebook);
+
     foreach ($students as $student) {
       if (!isset($grades[$student])) {  // create an empty record
-        $grades[$student] = array('uid' => $student, 'nid' => $nid, 'earned' => NULL, 'exempt' => NULL, 'timestamp' => NULL, 'note' => NULL,);  // only for form building - later unset any grade NULL 'earned' field.
+        $grades[$student] = array('uid' => $student, 'nid' => $nid, 'earned' => NULL, 'exempt' => NULL, 'timestamp' => NULL, 'note' => NULL, );  // only for form building - later unset any grade NULL 'earned' field.
       }
     }
     return drupal_get_form('gradebook_grade_assignment_form', $gradebook, $node, $grades);
@@ -203,9 +208,9 @@ function gradebook_grade_assignment_form($form_state, $gradebook, $node, $edit=a
     '#suffix' => '</div>',
   );
 
-  $form['grade'] = array (
+  $form['grade'] = array(
     '#tree' => TRUE,
-  );    
+  );
 
   foreach ($edit as $grade) {
     $grade = (array)$grade;
@@ -217,7 +222,7 @@ function gradebook_grade_assignment_form($form_state, $gradebook, $node, $edit=a
       '#value' => t('Name: %name', array('%name' => $account->name)),
       '#suffix' => '</div>',
       '#tree' => TRUE,
-     ); 
+    );
 
     $form['grade'][$uid]['exempt'] = array(
       '#type' => 'checkbox',
@@ -267,11 +272,11 @@ function gradebook_grade_assignment_form_validate($form, &$form_state) {
     if ($form_state['values']['grade'][$key]['earned'] != '' ) {
       $earned = $form_state['values']['grade'][$key]['earned'];
       if (is_numeric($earned) ? intval($earned) != $earned : TRUE) {
-        form_set_error('grade]['.$key.'][earned', t('The earned value for the assignment must be an integer.'));
+        form_set_error('grade]['. $key .'][earned', t('The earned value for the assignment must be an integer.'));
       }
-    } 
+    }
     elseif ($form_state['values']['grade'][$key]['note'] != '' ) {
-      form_set_error('grade]['.$key.'][earned', t('A grade must be given before the note can be saved.'));
+      form_set_error('grade]['. $key .'][earned', t('A grade must be given before the note can be saved.'));
     }
   }
 }
@@ -299,8 +304,9 @@ function gradebook_grade_assignment_form_submit($form, &$form_state) {
   unset($form_state['values']['return_url']);
 }
 
-/* 
-
+/*
+ *  TODO: fixup the grade assignment rendering
+ *
 function theme_gradebook_grade_assignment_form($form) {
   $output = '';
   $output .= drupal_render($form['name']);
@@ -313,12 +319,7 @@ function theme_gradebook_grade_assignment_form($form) {
   return $output;
 }
 
-*/
-
-//
-//  Edit all assignments for a selected student
-//
-
+ */
 
 /**
  *  Enter grades for all assignments for a selected student
@@ -333,7 +334,7 @@ function theme_gradebook_grade_assignment_form($form) {
 function gradebook_grade_student_page($gradebook, $uid) {  // access is limited to teacher through menu system
 
   // get sort order for query
-  $sort = (isset($_GET['sort']) && ($_GET['sort'] == 'asc')) ? 'desc' : 'asc'; 
+  $sort = (isset($_GET['sort']) && ($_GET['sort'] == 'asc')) ? 'desc' : 'asc';
 
   $account = user_load(array('uid' => $uid));
   if (gradebookapi_is_student($gradebook, $account)) {
@@ -342,7 +343,7 @@ function gradebook_grade_student_page($gradebook, $uid) {  // access is limited 
     $assignments = gradebook_get_sorted_assignments($gradebook, $tids, $order, $sort);
 
     // get grades for assignments
-    $grades = array(); 
+    $grades = array();
     foreach ($assignments as $assignment) {
       $grades[$assignment->nid] = (array)gradebookapi_get_grade($account->uid, $assignment->nid);
     }
@@ -363,9 +364,9 @@ function gradebook_grade_student_form($form_state, $gradebook, $account, $edit=a
       '#suffix' => '</div>',
   );
 
-  $form['grade'] = array (
+  $form['grade'] = array(
     '#tree' => TRUE,
-  );    
+  );
 
   foreach ($edit as $grade) {
     $grade = (array)$grade;
@@ -377,7 +378,7 @@ function gradebook_grade_student_form($form_state, $gradebook, $account, $edit=a
       '#value' => t('Assignment: %name', array('%name' => $node->title)),
       '#suffix' => '</div>',
       '#tree' => TRUE,
-     ); 
+    );
 
     $form['grade'][$nid]['possible'] = array(
       '#prefix' => '<div class="gradebook-grade-possible-form">',
@@ -437,11 +438,11 @@ function gradebook_grade_student_form_validate($form, &$form_state) {
     if ($form_state['values']['grade'][$key]['earned'] != '' ) {
       $earned = $form_state['values']['grade'][$key]['earned'];
       if (is_numeric($earned) ? intval($earned) != $earned : TRUE) {
-        form_set_error('grade]['.$key.'][earned', t('The earned value for the assignment must be an integer.'));
+        form_set_error('grade]['. $key .'][earned', t('The earned value for the assignment must be an integer.'));
       }
-    } 
+    }
     elseif ($form_state['values']['grade'][$key]['note'] != '' ) {
-      form_set_error('grade]['.$key.'][earned', t('A grade must be given before the note can be saved.'));
+      form_set_error('grade]['. $key .'][earned', t('A grade must be given before the note can be saved.'));
     }
   }
 }
@@ -469,8 +470,9 @@ function gradebook_grade_student_form_submit($form, &$form_state) {
   unset($form_state['values']['return_url']);
 }
 
-/* 
-
+/*
+ * TODO: fixup form rendering
+ *
 function theme_gradebook_grade_student_form($form) {
   $output = '';
   $output .= drupal_render($form['name']);
@@ -482,5 +484,5 @@ function theme_gradebook_grade_student_form($form) {
   $output .= drupal_render($form);
   return $output;
 }
-*/
+ */
 
