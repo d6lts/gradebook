@@ -34,8 +34,7 @@ function gradebookapi_menu() {
       'position'         => 'left',
       'weight'           => -5,
       'page callback'    => 'system_admin_menu_block_page',
-      'access callback'  => 'user_access',
-      'access arguments' => array('administer site configuration'),
+      'access arguments' => array('access administration pages'),
       'file'             => 'system.admin.inc',
       'file path'        => drupal_get_path('module', 'system'),
       );
@@ -66,6 +65,23 @@ function gradebookapi_help($path, $arg) {
       $output = '<p>'. t('The Gradebook suite of modules provides the framework and user interface for gradebooks that can be used by students and teachers. You can use the links below to configure these modules') .'</p>';
       return $output;
   }
+}
+
+/**
+ * Implementation of hook_user().
+ *
+ * @return NONE
+ */
+function gradebookapi_user($op, &$edit, &$account, $category = NULL) {
+
+  if ($op == 'delete' ) {
+    drupal_set_message(t('Deleting gradebook grades for %name (uid %d) since account is being deleted',  array('%name' => $account->name, '%d' => $account->uid)));
+
+    db_query("DELETE FROM {gradebookapi_grade} WHERE uid=%d", $account->uid);
+    db_query("DELETE FROM {gradebookapi_cache} WHERE uid=%d", $account->uid);
+    watchdog('gradebookapi', 'Deleted gradebook grades for %name (uid %d) upon deletion of account.', array('%name' => $account->name, '%d' => $account->uid), WATCHDOG_INFO);
+  }
+
 }
 
 /**
