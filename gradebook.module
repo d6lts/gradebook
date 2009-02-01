@@ -9,7 +9,7 @@
  * Implementation of hook_perm().
  */
 function gradebook_perm() {
-  return array('admin gradebook', 'access gradebook');
+  return array('admin gradebook', 'access gradebook', 'attach files to gradebook');
 }
 
 /**
@@ -19,9 +19,9 @@ function gradebook_theme() {
   return array(
     'gradebook_page'  => array('arguments' => array('gradebook', 'assignments', 'student_grades')),
     'gradebook_table' => array('arguments' => array('headers', 'rows', 'attributes', 'caption')),
-    'gradebook_assignment_grade' => array('arguments' => array('gradebook', 'grade')),
+//    'gradebook_assignment_grade' => array('arguments' => array('gradebook', 'grade')),
     'gradebook_term_grade' => array('arguments' => array('gradebook', 'grade')),
-    'gradebook_assignment_note' => array('arguments' => array('tid', 'account', 'node', 'grade')),
+    'gradebook_grade_form' => array('arguments' => array('form' => NULL)),
   );
 }
 
@@ -98,6 +98,7 @@ function gradebook_menu() {
     'weight'           => 5,
     'type'             => MENU_LOCAL_TASK,
   );
+// TODO: Why doesn't title callback work? 
 
   $items['gradebook/%gradebookapi_gradebook'] = array(
     'title'              => 'Gradebook Name',
@@ -107,11 +108,13 @@ function gradebook_menu() {
     'page arguments'     => array(1, 2),              // optional path element specifies user id
     'access callback'    => 'user_access',
     'access arguments'   => array('access gradebook'),
-    'type'               => MENU_LOCAL_TASK,
+    'type'               => MENU_CALLBACK,
   );
 
   $items['gradebook/%gradebookapi_gradebook/view'] = array(
     'title'              => 'view',
+    'access callback'    => 'user_access',
+    'access arguments'   => array('access gradebook'),
     'type'               => MENU_DEFAULT_LOCAL_TASK,
     'weight'             => -10,
   );
@@ -347,7 +350,7 @@ function gradebook_list_page() {
 
   $sql  = 'SELECT DISTINCT t.tid, t.name FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = '. $vid;
   $sql .= tablesort_sql($header, 'weight, ');
-  $result = pager_query($sql, variable_get('gradebooks_per_page', 25));
+  $result = pager_query($sql, variable_get('gradebook_gradebooks_per_page', 25));
   while ($term = db_fetch_object($result)) {
     $rows[] = array('name' => l($term->name, 'gradebook/'. $term->tid));
   }
@@ -398,20 +401,20 @@ function gradebook_get_sorted_assignments($gradebook, $tids, $order, $sort) {
 
   switch ($order) {
     case 'title':
-      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'n.title '. $sort);
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, TRUE, 'n.title '. $sort);
       break;
     case 'due':
-      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'a.due_date '. $sort);
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, TRUE, 'a.due_date '. $sort);
       break;
     case 'publish':
-      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'a.publish_date '. $sort);
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, TRUE, 'a.publish_date '. $sort);
       break;
     case 'possible':
-      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'a.possible '. $sort);
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, TRUE, 'a.possible '. $sort);
       break;
     case 'category':
     default:
-      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, FALSE, 'td.name '. $sort);
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, TRUE, 'td.name '. $sort);
   }
 
   $assignments = array();
@@ -602,6 +605,7 @@ function theme_gradebook_page($gradebook, $assignments, $student_grades, $export
   $output = '<div id="gradebook-container">';
   $output .= theme('gradebook_table', $headers, $rows, array('class' => 'gradebook'));
   $output .= '</div>';
+  $output .= theme('pager', NULL, variable_get('gradebook_grades_per_page', 10), 0);  // configure at admin screen!
 
   return $output;
 }
@@ -722,5 +726,3 @@ function theme_gradebook_table($headers, $rows, $attributes = array(), $caption 
   $output .= "</tbody></table>\n";
   return $output;
 }
-
-

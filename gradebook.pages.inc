@@ -19,138 +19,20 @@
  *
  */
 
-function gradebook_grade_page($gradebook, $uid, $nid) {
+function gradebook_grade_page($gradebook, $uid, $nid) {  //all users with 'access gradebook' permissions can view this page
   $account = user_load(array('uid' => $uid));
 
   if ($account !== FALSE && gradebookapi_is_student($gradebook, $account)) {
     $types = gradebookapi_get_assignment_types();
     $node = node_load($nid);
     if (in_array($node->type, $types)) {
-      $grade = gradebookapi_get_grade($uid, $nid);  //now its safe to get $grade
-
-      // check if this is a student or a teacher.
-
-      if (gradebookapi_is_teacher($gradebook)) { // a teacher can edit the grade
-        return drupal_get_form('gradebook_grade_form', $gradebook, $account, $node, (array)$grade);
-      }
-      else {  // must be a student - access callback ensures this - show a grade summary for their grades only
-        global $user;
-        $current = user_load(array('uid' => $user->uid));   // want to change url if $current != account?
-        return theme('gradebook_assignment_note', $gradebook->tid, $current, $node, $grade);
-      }
+      $grade = gradebookapi_get_grade($uid, $nid);
+      $grades[$uid] = (array)$grade;
+      return drupal_get_form('gradebook_grade_form', $gradebook, $grades);
     }
   }
   drupal_not_found();
 }
-
-function gradebook_grade_form($form_state, $gradebook, $account, $node, $edit = array()) {
-
-  $form['user'] = array(
-    '#prefix' => '<div class="gradebook-grade-student-form">',
-    '#value' => t('Student: %name', array('%name' => $account->name)),
-    '#suffix' => '</div>',
-  );
-
-  $form['node'] = array(
-    '#prefix' => '<div class="gradebook-grade-title-form">',
-    '#value' => t('Assignment: %title', array('%title' => $node->title)),
-    '#suffix' => '</div>',
-  );
-
-  $form['possible'] = array(
-    '#prefix' => '<div class="gradebook-grade-possible-form">',
-    '#value' => t('Possible: %possible', array('%possible' => $node->possible)),
-    '#suffix' => '</div>',
-  );
-
-  $form['earned'] = array(
-    '#title' => t('Earned'),
-    '#type' => 'textfield',
-    '#prefix' => '<div class="gradebook-grade-earned-form">',
-    '#default_value' => $edit['earned'],
-    '#maxlength' =>  64,
-    '#description' => t('The grade earned.'),
-    '#suffix' => '</div>',
-    '#required' => TRUE
-  );
-
-  $form['exempt'] = array(
-    '#type' => 'checkbox',
-    '#prefix' => '<div class="gradebook-grade-exempt-form">',
-    '#title' => t('Exempt student from this assignment'),
-    '#suffix' => '</div>',
-    '#default_value' => $edit['exempt'],
-  );
-
-  $form['note'] = array(
-    '#type' => 'textarea',
-    '#prefix' => '<div class="gradebook-grade-note-form">',
-    '#title' => t('Note to student'),
-    '#suffix' => '</div>',
-    '#default_value' => $edit['note'],
-  );
-
-  $form['uid'] = array(
-    '#type' => 'hidden',
-    '#value' => $account->uid,
-  );
-  $form['nid'] = array(
-    '#type' => 'hidden',
-    '#value' => $node->nid,
-  );
-
-  $form['return_url'] = array(
-   '#type' => 'hidden',
-   '#value' => 'gradebook/'. $gradebook->tid,
-  );
-
-  $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Save'),
-  );
-
-  return $form;
-}
-
-function gradebook_grade_form_validate($form, &$form_state) {
-  if (is_numeric($form_state['values']['earned']) ? intval($form_state['values']['earned']) != $form_state['values']['earned'] : TRUE) {
-    form_set_error('earned', t('The earned value for the assignment must be an integer.'));
-  }
-}
-
-function gradebook_grade_form_submit($form, &$form_state) {
-  $account = user_load(array('uid' => $form_state['values']['uid']));
-  $node = node_load($form_state['values']['nid']);
-
-  $grade = (object)$form_state['values'];
-  $grade->possible = $node->possible;
-
-  gradebookapi_set_grade($grade);
-  drupal_set_message(t('Saved %type.', array('%type' => t('grade'))));
-  $form_state['redirect'] = $form_state['values']['return_url'];
-  unset($form_state['values']['return_url']);
-}
-
-function gradebook_rebuild_page($gradebook) {
-  gradebookapi_rebuild_grades($gradebook->tid);
-  drupal_goto('gradebook/'. $gradebook->tid);
-}
-
-function theme_gradebook_assignment_note($tid, $account, $node, $grade) {
-  $header = array();
-  $row = array();
-  $row[] = array(t('Student'), $account->name);
-  $row[] = array(t('Assignment'), $node->title);
-  $row[] = array(t('Possible'), $node->possible);
-  $row[] = array(t('Earned'), $grade->earned);
-  $row[] = array(t('Note'), $grade->note);
-  $row[] = array('', l(t('Return to gradebook'), 'gradebook/'. $tid));
-  return theme('table', $header, $row);
-}
-
-//
-// MGN: working on extending the UI for entering grades by assignment
-//
 
 /**
  *  Enter grades for all students by assignment
@@ -168,171 +50,17 @@ function gradebook_grade_assignment_page($gradebook, $nid) {  // only accessed b
   if (in_array($node->type, $types)) {
     $grades = array();
     $students = array();
-
     $students = gradebookapi_get_students($gradebook);
-    $sql = 'SELECT uid, nid, earned, exempt, timestamp, note FROM {gradebookapi_grade} WHERE nid = %d';
-    $result = db_query($sql, $nid);
-    while ($grade = db_fetch_object($result)) {
-      // do not load grades that exist in the database for students that are no longer active students...
-      // TODO: When a user account is deleted, remove grades after giving opportunity to archive
-      if (in_array($grade->uid, $students)) {   // grade is for an active student
-        $grades[$grade->uid] = (array)$grade;
-      }
+    foreach ($students as $uid) {
+      $grade = gradebookapi_get_grade($uid, $nid);  //now its safe to get $grade
+      $grades[$uid] = (array)$grade;
     }
-
-    foreach ($students as $student) {
-      if (!isset($grades[$student])) {  // create an empty record
-        $grades[$student] = array('uid' => $student, 'nid' => $nid, 'earned' => NULL, 'exempt' => NULL, 'timestamp' => NULL, 'note' => NULL, );  // only for form building - later unset any grade NULL 'earned' field.
-      }
-    }
-    return drupal_get_form('gradebook_grade_assignment_form', $gradebook, $node, $grades);
+    return drupal_get_form('gradebook_grade_form', $gradebook, $grades);
   }
   drupal_not_found();
 }
 
-function gradebook_grade_assignment_form($form_state, $gradebook, $node, $edit=array()) {
-  // TODO: cleanup grade form rendering
-  //       ideally edit is in-place in gradebook using AJAX
-  //  fields uid, nid, earned, exempt, possible, timestamp, note
-  // loop over students
-
-  $form['node'] = array(
-    '#prefix' => '<div class="gradebook-grade-title-form">',
-    '#value' => t('Assignment: %title', array('%title' => $node->title)),
-    '#suffix' => '</div>',
-  );
-
-  $form['possible'] = array(
-    '#prefix' => '<div class="gradebook-grade-possible-form">',
-    '#value' => t('Possible: %possible', array('%possible' => $node->possible)),
-    '#suffix' => '</div>',
-  );
-
-  $form['grade'] = array(
-    '#tree' => TRUE,
-  );
-
-  foreach ($edit as $grade) {
-    $grade = (array)$grade;
-    $uid = $grade['uid'];
-    $account = user_load(array('uid' => $uid));
-
-    $form['grade'][$uid] = array(
-      '#prefix' => '<div class="gradebook-grade-student-form">',
-      '#value' => t('Name: %name', array('%name' => $account->name)),
-      '#suffix' => '</div>',
-      '#tree' => TRUE,
-    );
-
-    $form['grade'][$uid]['exempt'] = array(
-      '#type' => 'checkbox',
-      '#prefix' => '<div class="gradebook-grade-exempt-form">',
-      '#title' => t('Exempt'),
-      '#suffix' => '</div>',
-      '#tree' => TRUE,
-      '#default_value' => $grade['exempt'],
-    );
-
-    $form['grade'][$uid]['earned'] = array(
-      '#title' => t('earned'),
-      '#type' => 'textfield',
-      '#prefix' => '<div class="gradebook-grade-earned-form">',
-      '#default_value' => $grade['earned'],
-      '#size' => 10,
-      '#suffix' => '</div>',
-      '#tree' => TRUE,
-    );
-
-    $form['grade'][$uid]['note'] = array(
-      '#type' => 'textarea',
-      '#prefix' => '<div class="gradebook-grade-note-form">',
-      '#title' => t('note'),
-      '#default_value' => $grade['note'],
-      '#cols' => 32,
-      '#rows' => 5,
-      '#suffix' => '</div>',
-      '#tree' => TRUE,
-    );
-  }
-
-  $form['nid'] = array( '#type' => 'hidden', '#value' => $node->nid);
-  $form['return_url'] = array( '#type' => 'hidden', '#value' => 'gradebook/'. $gradebook->tid);
-
-  $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Save'),
-  );
-
-  return $form;
-}
-
-function gradebook_grade_assignment_form_validate($form, &$form_state) {
-  $keys = array_keys($form_state['values']['grade']);
-  foreach ($keys as $key) {
-    if ($form_state['values']['grade'][$key]['earned'] != '' ) {
-      $earned = $form_state['values']['grade'][$key]['earned'];
-      if (is_numeric($earned) ? intval($earned) != $earned : TRUE) {
-        form_set_error('grade]['. $key .'][earned', t('The earned value for the assignment must be an integer.'));
-      }
-    }
-    elseif ($form_state['values']['grade'][$key]['note'] != '' ) {
-      form_set_error('grade]['. $key .'][earned', t('A grade must be given before the note can be saved.'));
-    }
-  }
-}
-
-function gradebook_grade_assignment_form_submit($form, &$form_state) {
-  $node = node_load($form_state['values']['nid']);
-
-  $keys = array_keys($form_state['values']['grade']);
-  $count = 0;
-  foreach ($keys as $key) {
-    if ($form_state['values']['grade'][$key]['earned'] != '' ) { //only update when grades are provided...
-      $grade = (object)$form_state['values']['grade'][$key];
-      $grade->uid = $key;
-      $grade->nid = $node->nid;
-      $grade->possible = $node->possible;
-      $grade->due_date = $node->due_date;
-      $grade->publish_date = $node->publish_date;
-      $grade->note = check_plain($grade->note);    // is this correct here?
-      gradebookapi_set_grade($grade);
-      ++$count;
-    }
-  }
-  drupal_set_message(t('Saved %num %type.', array('%num' => $count, '%type' => t('grades'))));
-  $form_state['redirect'] = $form_state['values']['return_url'];
-  unset($form_state['values']['return_url']);
-}
-
-/*
- *  TODO: fixup the grade assignment rendering
- *
-function theme_gradebook_grade_assignment_form($form) {
-  $output = '';
-  $output .= drupal_render($form['name']);
-  $output .= '<div class="foo">';
-  $output .= drupal_render($form['access']);
-  $output .= '<div class="bar">';
-  $output .= drupal_render($form['details']);
-  $output .= '</div></div>';
-  $output .= drupal_render($form);
-  return $output;
-}
-
- */
-
-/**
- *  Enter grades for all assignments for a selected student
- *    This form is only accessible to teachers
- *  @param $gradebook
- *    the $gradebook object
- *  @param $uid
- *    path argument for the student user id that we want to grade
- *
- */
-
 function gradebook_grade_student_page($gradebook, $uid) {  // access is limited to teacher through menu system
-
   // get sort order for query
   $sort = (isset($_GET['sort']) && ($_GET['sort'] == 'asc')) ? 'desc' : 'asc';
 
@@ -347,142 +75,258 @@ function gradebook_grade_student_page($gradebook, $uid) {  // access is limited 
     foreach ($assignments as $assignment) {
       $grades[$assignment->nid] = (array)gradebookapi_get_grade($account->uid, $assignment->nid);
     }
-    return drupal_get_form('gradebook_grade_student_form', $gradebook, $account, $grades);
+    return drupal_get_form('gradebook_grade_form', $gradebook, $grades);
   }
   drupal_not_found();
 }
 
-function gradebook_grade_student_form($form_state, $gradebook, $account, $edit=array()) {
-  // TODO: cleanup grade form rendering
-  //       ideally edit is in-place in gradebook using AJAX
-  //  fields uid, nid, earned, exempt, possible, timestamp, note
-  // loop over students
+function gradebook_grade_form($form_state, $gradebook, $grades) {
+  global $user;
 
-  $form['name'] = array(
-      '#prefix' => '<div class="gradebook-grade-student-form">',
-      '#value' => t('Name: %name', array('%name' => $account->name)),
+  $teacher = gradebookapi_is_teacher($gradebook);
+
+  $attach_allowed = array_filter((array)variable_get('gradebook_attachment_roles', array()));
+  $attach_permission = (gradebookapi_is_student($gradebook) && in_array('students', $attach_allowed)) || ($teacher && in_array('teachers', $attach_allowed)) || user_access('attach files to gradebook');
+
+  $form = array('#theme' => 'gradebook_grade_form');
+  $form['grade'] = array('#tree' => TRUE);
+
+  $options = array();
+  foreach ($grades as $id => $grade) {
+    $options[$id] = '';  // radio buttons for each grade, but no labels
+    $account = user_load(array('uid' => $grade['uid']));
+    $node = node_load($grade['nid']);
+    $form['grade'][$id]['uid'] = array('#type' => 'hidden', '#value' => $account->uid);
+    $form['grade'][$id]['nid'] = array('#type' => 'hidden', '#value' => $node->nid);
+    $form['grade'][$id]['user'] = array('#value' => $account->name);
+    $form['grade'][$id]['node'] = array('#value' => $node->title);
+    $form['grade'][$id]['possible'] = array('#value' => $node->possible);
+
+    if ($teacher) {  // display edit form
+      $form['grade'][$id]['earned'] = array('#type' => 'textfield', '#size' => 2, '#default_value' => $grade['earned']);
+      $form['grade'][$id]['exempt'] = array('#type' => 'checkbox', '#default_value' => $grade['exempt']);
+      $form['grade'][$id]['note'] = array('#type' => 'textarea', '#cols' => 25, '#rows' => 6, '#default_value' => $grade['note']);
+    }
+    else { // display grades without option for editing
+      $form['grade'][$id]['earned'] = array('#value' => $grade['earned']);
+      $form['grade'][$id]['exempt'] = array('#type' => 'checkbox', '#value' => $grade['exempt'], '#disabled' => TRUE);
+      $form['grade'][$id]['note']   = array('#value' => $grade['note']);
+    }
+
+    if (!empty($form_state['storage'][$id])) {
+      foreach ($form_state['storage'][$id] as $file) {
+        $grade['files'][$file['fid']] = $file;
+      }
+    }
+    $form['grade'][$id]['attachments'] = array(
+      '#prefix' => '<div id="gradebook-attachments">',
       '#suffix' => '</div>',
-  );
-
-  $form['grade'] = array(
-    '#tree' => TRUE,
-  );
-
-  foreach ($edit as $grade) {
-    $grade = (array)$grade;
-    $nid = $grade['nid'];
-    $node = node_load(array('nid' => $nid));
-
-    $form['grade'][$nid] = array(
-      '#prefix' => '<div class="gradebook-grade-title-form">',
-      '#value' => t('Assignment: %name', array('%name' => $node->title)),
-      '#suffix' => '</div>',
-      '#tree' => TRUE,
     );
-
-    $form['grade'][$nid]['possible'] = array(
-      '#prefix' => '<div class="gradebook-grade-possible-form">',
-      '#value' => t('Possible: %possible', array('%possible' => $node->possible)),
-      '#tree' => TRUE,
-      '#suffix' => '</div>',
+    $form['grade'][$id]['attachments'] += gradebook_upload_form($id, $grade, $teacher);
+  }
+  if ($attach_permission) {
+    // Make sure necessary directories exist and are writable before displaying the attachment form.
+    $path = file_directory_path();
+    $temp = file_directory_temp();
+    if (!file_check_directory($path, FILE_CREATE_DIRECTORY) || !file_check_directory($temp, FILE_CREATE_DIRECTORY)) {
+      $form['new']['#description'] =  t('File attachments are disabled. The file directories have not been properly configured.');
+      if (user_access('administer site configuration')) {
+        $form['new']['#description'] .= ' '. t('Please visit the <a href="@admin-file-system">file system configuration page</a>.', array('@admin-file-system' => url('admin/settings/file-system')));
+      }
+      else {
+        $form['new']['#description'] .= ' '. t('Please contact the site administrator.');
+      }
+    }
+    $limits = _upload_file_limits($user);
+    $form['new']['#weight'] = 10;
+    $form['new']['upload'] = array(
+      '#type' => 'file',
+      '#title' => t('Attach new file'),
+      '#size' => 40,
+      '#description' => t('Select a grade to attach file to before pressing <em>attach</em>. Files will not be saved until the the <em>Save All</em> button is pressed.') .  ($limits['resolution'] ? t('Images are larger than %resolution will be resized. ', array('%resolution' => $limits['resolution'])) : '') . t('The maximum upload size is %filesize. Only files with the following extensions may be uploaded: %extensions. ', array('%extensions' => $limits['extensions'], '%filesize' => format_size($limits['file_size']))),
     );
-
-    $form['grade'][$nid]['exempt'] = array(
-      '#type' => 'checkbox',
-      '#prefix' => '<div class="gradebook-grade-exempt-form">',
-      '#title' => t('Exempt'),
-      '#suffix' => '</div>',
-      '#tree' => TRUE,
-      '#default_value' => $grade['exempt'],
-    );
-
-    $form['grade'][$nid]['earned'] = array(
-      '#prefix' => '<div class="gradebook-grade-earned-form">',
-      '#title' => t('earned'),
-      '#type' => 'textfield',
-      '#default_value' => $grade['earned'],
-      '#size' => 10,
-      '#suffix' => '</div>',
-      '#tree' => TRUE,
-    );
-
-    $form['grade'][$nid]['note'] = array(
-      '#type' => 'textarea',
-      '#prefix' => '<div class="gradebook-grade-note-form">',
-      '#title' => t('note'),
-      '#default_value' => $grade['note'],
-      '#cols' => 32,
-      '#rows' => 5,
-      '#suffix' => '</div>',
-      '#tree' => TRUE,
-    );
+    $form['new']['attach'] = array('#type' => 'submit', '#value' => t('Attach'), '#validate' => array('gradebook_upload_form_attach_another'));
+    $form['#attributes']['enctype'] = 'multipart/form-data';
+    $form['attach permission'] = array('#type' => 'value', '#value' => TRUE);
+  }
+  else {
+    $form['attach permission'] = array('#type' => 'value', '#value' => FALSE);
+  }
+  if (count($options) > 1) {
+    $form['gradeid'] = array('#type' => 'radios', '#required' => FALSE, '#options' => $options);
+  }
+  else {
+    $form['gradeid'] = array('#type' => 'hidden', '#value' => $id);  // automatically selected
   }
 
-  $form['uid'] = array( '#type' => 'hidden', '#value' => $account->uid);
-  $form['return_url'] = array( '#type' => 'hidden', '#value' => 'gradebook/'. $gradebook->tid);
+  $form['return_url'] = array('#type' => 'hidden', '#value' => 'gradebook/'. $gradebook->tid);
+  $form['teacher'] = array('#type' => 'hidden', '#value' => $teacher);
+  if ($teacher || $attach_permission) {  //teachers might be saving grades, students may attach files
+    $form['submit'] = array('#type' => 'submit', '#value' => t('Save All'));
+  }
+  $form['cancel'] = array('#type' => 'submit', '#value' =>  t('Return to Gradebook'), '#submit' => array('gradebook_grade_form_cancel'));
 
-  $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Save'),
-  );
+  return $form;
+}
+function gradebook_upload_form($id, $edit, $teacher = FALSE) {
+
+  $form = array('#cache' => TRUE);
+
+  if (isset($edit['files'])) {
+    $files = $edit['files'];
+  }
+
+  if (!empty($files) && is_array($files)) {  // need to show files that are already uploaded...
+    $form['files']['#tree'] = TRUE;
+    global $user;
+    foreach ($files as $key => $file) {
+      $file = (object)$file;
+      $allow_edit = $teacher  || ($user->uid == $file->uid);  // users can edit their own uploads, teachers can edit all
+      if ($file->list || $allow_edit) { // display the form elements
+        $form['files'][$key]['description'] = array('#type' => 'textfield', '#default_value' => !empty($file->description) ? $file->description : $file->filename, '#size' => 25, '#maxlength' => 255, '#disabled' => !$allow_edit);        
+        $form['files'][$key]['remove'] = array('#type' => 'checkbox', '#default_value' => !empty($file->remove), '#disabled' => !$allow_edit);
+        $form['files'][$key]['list'] = array('#type' => 'checkbox',  '#default_value' => $file->list, '#disabled' => !$allow_edit);
+      }
+      else {
+        $form['files'][$key]['description'] = array('#type' => 'value', '#value' => !empty($file->description) ? $file->description : $file->filename);
+        $form['files'][$key]['remove'] = array('#type' => 'value', '#value' => !empty($file->remove));
+        $form['files'][$key]['list'] = array('#type' => 'value', '#value' => $file->list);
+      }
+      $form['files'][$key]['size']     = array('#type' => 'value', '#value' => format_size($file->filesize));
+      $form['files'][$key]['filename'] = array('#type' => 'value', '#value' => $file->filename);
+      $form['files'][$key]['filepath'] = array('#type' => 'value', '#value' => $file->filepath);
+      $form['files'][$key]['filemime'] = array('#type' => 'value', '#value' => $file->filemime);
+      $form['files'][$key]['filesize'] = array('#type' => 'value', '#value' => $file->filesize);
+      $form['files'][$key]['fid']      = array('#type' => 'value', '#value' => $file->fid);
+      $form['files'][$key]['uid']      = array('#type' => 'value', '#value' => $file->uid);
+      $form['files'][$key]['saved']    = array('#type' => 'value', '#value' => $file->saved);
+    }
+  }
 
   return $form;
 }
 
-// this is a duplication of gradebook_grade_assignment_form_validate
-// how can we share form validation?
+function gradebook_upload_form_attach_another($form, &$form_state) {
+  // handle the file upload
 
-function gradebook_grade_student_form_validate($form, &$form_state) {
-  $keys = array_keys($form_state['values']['grade']);
-  foreach ($keys as $key) {
-    if ($form_state['values']['grade'][$key]['earned'] != '' ) {
-      $earned = $form_state['values']['grade'][$key]['earned'];
-      if (is_numeric($earned) ? intval($earned) != $earned : TRUE) {
-        form_set_error('grade]['. $key .'][earned', t('The earned value for the assignment must be an integer.'));
+  global $user;
+
+  $limits = _upload_file_limits($user);
+  $validators = array(
+    'file_validate_extensions' => array($limits['extensions']),
+    'file_validate_image_resolution' => array($limits['resolution']),
+    'file_validate_size' => array($limits['file_size'], $limits['user_size']),
+  );
+  // Save new file uploads.
+  if ($form_state['values']['attach permission'] && ($file = file_save_upload('upload', $validators, file_directory_path()))) {
+    $id = $form_state['values']['gradeid'];
+    $file->list = 1; // list files by default
+    $file->saved = FALSE;
+    $file->uid = $user->uid;
+    $file->description = $file->filename;
+    $form_state['storage'][$id][$file->fid] = (array)$file;
+  }
+  $form_state['rebuild'] = TRUE;
+}
+
+function gradebook_grade_form_validate($form, &$form_state) {
+  if ($form_state['values']['teacher']) {
+    $keys = element_children($form_state['values']['grade']);
+    foreach ($keys as $key) {
+      if (isset($form_state['values']['grade'][$key]['earned']) && $form_state['values']['grade'][$key]['earned'] != '') {
+        $earned = $form_state['values']['grade'][$key]['earned'];
+        if (is_numeric($earned) ? intval($earned) != $earned : TRUE) {
+          form_set_error('grade]['. $key .'][earned', t('The earned value for the assignment must be an integer.'));
+        }
       }
     }
-    elseif ($form_state['values']['grade'][$key]['note'] != '' ) {
-      form_set_error('grade]['. $key .'][earned', t('A grade must be given before the note can be saved.'));
-    }
-  }
+  } // nothing to validate unless user can modify grade values.
 }
 
-function gradebook_grade_student_form_submit($form, &$form_state) {
+function gradebook_grade_form_cancel($form, &$form_state) {
+    $form_state['redirect'] = $form_state['values']['return_url'];
+    unset($form_state['values']['return_url']);
+}
 
-  $nids = array_keys($form_state['values']['grade']);
-  $count = 0;
-  foreach ($nids as $nid) {
-    if ($form_state['values']['grade'][$nid]['earned'] != '' ) { //only update when grades are provided...
-      $node = node_load($nid);  // check syntax here
-      $grade = (object)$form_state['values']['grade'][$nid];
-      $grade->nid = $nid;
-      $grade->uid = $form_state['values']['uid'];
-      $grade->possible = $node->possible;
-      $grade->due_date = $node->due_date;
-      $grade->publish_date = $node->publish_date;
-      $grade->note = check_plain($grade->note);    // is this correct here?
-      gradebookapi_set_grade($grade);
+function gradebook_grade_form_submit($form, &$form_state) {
+    $keys = array_keys($form_state['values']['grade']);
+    $count = 0;
+    foreach ($keys as $key) {
+      $grade = (object)$form_state['values']['grade'][$key];
+      if ($form_state['values']['teacher']) {
+        $node = node_load($form_state['values']['grade'][$key]['nid']);
+        $grade->due_date = $node->due_date;
+        $grade->publish_date = $node->publish_date;
+        gradebookapi_set_grade($grade);
+      }
+      else {
+        gradebookapi_manage_attachments($grade); // must have permissions to upload files to get this far...
+      }
       ++$count;
     }
-  }
-  drupal_set_message(t('Saved %num %type.', array('%num' => $count, '%type' => t('grades'))));
-  $form_state['redirect'] = $form_state['values']['return_url'];
-  unset($form_state['values']['return_url']);
+    unset($form_state['storage']);  // clear the storage bins now that files have been saved - needed for redirect
+    if ($count >0) {
+      drupal_set_message(t('Saved %num %type.', array('%num' => $count, '%type' => t('grades'))));
+    }
+    else {
+      drupal_set_message(t('No changes were made to grades'));
+    }
+    $form_state['redirect'] = $form_state['values']['return_url'];
+    unset($form_state['values']['return_url']);
 }
 
-/*
- * TODO: fixup form rendering
- *
-function theme_gradebook_grade_student_form($form) {
-  $output = '';
-  $output .= drupal_render($form['name']);
-  $output .= '<div class="foo">';
-  $output .= drupal_render($form['access']);
-  $output .= '<div class="bar">';
-  $output .= drupal_render($form['details']);
-  $output .= '</div></div>';
+function theme_gradebook_grade_form(&$form) {
+  global $user;
+  $ids = element_children($form['grade']);  // same as element_children ($form['gradeid'])
+  $selectid = count($ids);
+  $header = array();
+  if ($selectid > 1) {
+    $header = array('select' => t('Select'));  // don't show column heading unless there is more than one choice
+  }
+  $header += array('name' => t('Name'), 'title' => t('Assignment Title'), 'grade' => t('Grade'), 'exempt' => t('Exempt'), 'note' => t('Note'));
+  foreach ($ids as $id) {
+    $row = NULL;
+    if  ($selectid > 1) {  // don't show radio button for a single entry
+      $row[] = array('data' => drupal_render($form['gradeid'][$id]), 'class' => 'select');
+    }
+    $row[] = array('data' => drupal_render($form['grade'][$id]['user']), 'class' => 'name');
+    $row[] = array('data' => drupal_render($form['grade'][$id]['node']), 'class' => 'title');
+    $row[] = array('data' => drupal_render($form['grade'][$id]['earned']) .'/'. drupal_render($form['grade'][$id]['possible']), 'class' => 'earned-possible');
+    $row[] = array('data' => drupal_render($form['grade'][$id]['exempt']), 'class' => 'exempt-box');
+    $output = '<div class="note">'. drupal_render($form['grade'][$id]['note']) .'</div>';
+
+    $keys = element_children($form['grade'][$id]['attachments']['files']);
+
+    if (count($keys) > 0) {  // show attachment block if files are attached
+      $attachment_header = array(t('Attachment'), t('Link'), t('List'), t('Remove'));
+      $attachment_rows = NULL;
+      foreach ($keys as $key) {
+        $view_row = $form['grade'][$id]['attachments']['files'][$key]['list']['#value'] ||
+                   ($form['grade'][$id]['attachments']['files'][$key]['uid']['#value'] == $user->uid) ||
+                    $form['teacher']['#value'];  // allow teacher to view row, whatever the student checks...
+        if ($view_row) {
+          $attachment_row = NULL;
+          $attachment_row[] = drupal_render($form['grade'][$id]['attachments']['files'][$key]['description']);
+          $attachment_row[] = l('View', $form['grade'][$id]['attachments']['files'][$key]['filepath']['#value']);
+          $attachment_row[] = drupal_render($form['grade'][$id]['attachments']['files'][$key]['list']);
+          $attachment_row[] = drupal_render($form['grade'][$id]['attachments']['files'][$key]['remove']);
+          $attachment_rows[] = array('data' => $attachment_row);
+        }
+      }
+      $output .= (count($attachment_rows) > 0) ? theme('table', $attachment_header, $attachment_rows) : '';
+    }
+    $row[] = array('data' => $output);
+    $rows[] = array('data' => $row);
+  }
+  $output = theme('table', $header, $rows, array('class' => 'gradebook'));
+  $output .= theme('pager', NULL, variable_get('gradebook_grades_per_page', 10), 0);  // configure at admin screen!
+  $output .= '<div>'. drupal_render($form['new']['upload']) . drupal_render($form['new']['attach']) .'</div>';
+  $output .= '<div>'. drupal_render($form['submit']) . drupal_render($form['cancel']) .'</div>';
   $output .= drupal_render($form);
   return $output;
 }
- */
 
+function gradebook_rebuild_page($gradebook) {
+  gradebookapi_rebuild_grades($gradebook->tid);
+  drupal_goto('gradebook/'. $gradebook->tid);
+}

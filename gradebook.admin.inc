@@ -19,7 +19,7 @@ function gradebook_admin_list_page() {
 
   $sql  = 'SELECT DISTINCT t.tid, t.name FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = '. $vid;
   $sql .= tablesort_sql($header, 'weight, ');
-  $result = pager_query($sql, variable_get('gradebooks_per_page', 25));
+  $result = pager_query($sql, variable_get('gradebook_gradebooks_per_page', 25));
 
   while ($term = db_fetch_object($result)) {
     $rows[] = array('name' => l($term->name, 'gradebook/'. $term->tid), 'operations' => l(t('edit'), 'admin/gradebook/gradebook/edit/'. $term->tid));
@@ -186,6 +186,23 @@ function gradebook_admin_settings() {
     '#collapsed' => FALSE,
   );
 
+  $sel_roles = (array) variable_get('gradebook_attachment_roles', array());
+  $default = array();
+  foreach ($sel_roles as $role => $value) {
+    if ($value) {
+      $default[] = $role;
+    }
+  }
+
+  $form['general']['gradebook_attachment_roles'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Grade attachments'),
+    '#default_value' => $default,
+    '#options' => array('teachers' => t('Teachers'), 'students' => t('Students')),
+    '#description' =>  t('Check the gradebook roles that are allowed to attach files to grade entries. Drupal roles with permission to <em>attach files to gradebook</em> are automatically granted permission.'),
+    '#required' => FALSE,
+  );
+
   $form['general']['gradebook_empty_grade'] = array(
     '#type' => 'textfield',
     '#title' => t('Empty grade'),
@@ -194,13 +211,22 @@ function gradebook_admin_settings() {
     '#required' => TRUE,
   );
 
-  $number = drupal_map_assoc(array(10, 25, 50, 75, 100));
-  $form['general']['gradebooks_per_page'] = array(
+  $number = drupal_map_assoc(array(5, 10, 25, 50, 100));
+  $form['general']['gradebook_gradebooks_per_page'] = array(
     '#type' => 'select',
     '#title' => t('Gradebooks per page'),
     '#default_value' => variable_get('gradebooks_per_page', 25),
     '#options' => $number,
     '#description' => t('The default number of gradebooks displayed per page.'),
+  );
+
+  $number = drupal_map_assoc(range(5, 25));
+  $form['general']['gradebook_grades_per_page'] = array(
+    '#type' => 'select',
+    '#title' => t('Grades per page'),
+    '#default_value' => variable_get('gradebook_grades_per_page', 10),
+    '#options' => $number,
+    '#description' => t('The default number of assignments, displayed on the gradebook page, and grades on the grade edit forms. A pager will display when the number of entries exceeds this number.'),
   );
 
   return system_settings_form($form);

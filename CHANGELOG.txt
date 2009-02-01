@@ -1,24 +1,50 @@
 /* $Id$ */
 
-Gradebook 6.x.2.x-dev, 2009-01-18
+Gradebook 6.x.2.x-dev, 2009-01-31
 ----------------------
+- #367150 by MGN: Added file attachments for gradebook entries for teachers and students. 
+  This necessitated a new table gradebookapi_files, so its important to run update.php when 
+  upgrading. Also, many changes to gradebookapi to load, remove and otherwise manage these 
+  files. Added general gradebook configuration to allow students, teachers or both to attach files.
+- #367154 by MGN: Fixed pager support for  gradebook pages with many assignments or edit forms 
+  with many grade entries. Added general gradebook configuration of the number of grades to display 
+  on a gradebook page.
+- by MGN: Redesigned grade_assigment_page and grade_student_page to call the same gradebook_grade_form. 
+  Less code to manage and a more consistent, uniform css-styled UI.
+- by MGN: Changed the {gradebookapi_grade} 'earned' field so it can be null. This allows for grades to be 
+  reset to null when the grade is edited, if desired. It was previously being reset to 0. This 
+  also required a couple of minor changes to the gradebookapi_calc_grades function because earned 
+  can be null even when $grade is not.
+- by MGN: Updated README.txt to explain new features.
+
+Gradebook 6.x.2.x-dev, 2009-01-20
+----------------------
+- #360414 by MGN: Added new feature to delete gradebook grades when account is deleted.
+
+Gradebook 6.x.2.x-dev, 2009-01-1
+----------------------
+- by MGN: added access gradebook permission.
 - #360407 by MGN: added export gradebook feature, borrowing heavily from the webform module. This 
-  adds a menu local item to export the gradebook to Excel or text file. Most of the new code is in
-  two include file gradebook_report.inc and gradebook_export.inc. To avoid code duplication,
-  gradebook_gradebook_page() was modified to return rows for a text table when called with
-  the argument $export = TRUE.  
+  adds a menu local item to export the gradebook to Excel or text file. Most of the new code is in 
+  two include file gradebook_report.inc and gradebook_export.inc. To avoid code duplication, 
+  gradebook_gradebook_page() was modified to return rows for a text table when called with the 
+  argument = TRUE.
 
 Gradebook 6.x.2.x-dev, 2009-01-17
 ----------------------
-- rewrote hook_gradebookapi_teachers and hook_gradebookapi_students so creating a new drupal role does 
-  not automatically give it teacher and student status. Also separated out common code into a helper 
-  function _gradebook_gradebookapi_role to avoid code duplication.
+- by MGN: rewrote hook_gradebookapi_teachers and hook_gradebookapi_students so creating a new drupal 
+  role does not automatically give it teacher and student status. Also separated out common code into 
+  a helper function _gradebook_gradebookapi_role to avoid code duplication.
 
 Gradebook 6.x.2.x-dev, 2009-01-13
 ----------------------
 - #358236 by MGN: incorrect use of url() in form redirect.
 
-Gradebook 6.x.2.x-dev, 2009-01-05
+Gradebook 6.x.2.x-dev, 2009-01-08
+----------------------
+- by MGN: updating README.txt
+
+Gradebook 6.x.2.x-dev, 2009-01-07
 ----------------------
 - Added two forms to improve UI: 
 -   * grade all students for a select assignment, and grade all assignments for a selected student

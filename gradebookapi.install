@@ -39,7 +39,7 @@ function gradebookapi_schema() {
     'fields' => array(
       'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
-      'earned'      => array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
+      'earned'      => array('type' => 'int', 'unsigned' => FALSE, 'not null' => FALSE),
       'exempt'      => array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'size' => 'tiny', 'default' => 0),
       'timestamp'   => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'note'        => array('type' => 'text', 'unsigned' => FALSE, 'not null' => FALSE, 'size' => 'big'),
@@ -55,6 +55,23 @@ function gradebookapi_schema() {
       'possible'    => array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
     ),
     'primary key' => array('tid', 'uid'),
+  );
+
+  $schema['gradebookapi_files'] = array(
+    'fields' => array(
+      'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'fid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE),
+      'list'        => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny',
+                             'description' => t('Whether the file should be visibly listed on the grade note.'), ),
+      'description' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+    ),
+    'indexes' => array(
+      'nid' => array('nid'),
+      'uid' => array('uid'),
+      'fid' => array('fid'),
+    ),
+    'primary key' => array('fid'),
   );
 
   return $schema;
@@ -105,5 +122,35 @@ function gradebookapi_update_6001() {
         'default' => 0,
         'disp-width' => '10',
         ));
+  return $ret;
+}
+
+// add a file id field for gradebook_grade table to allow file attachment to grade object
+
+function gradebookapi_update_6002() {
+  // add new table for gradebook file attachments
+  $schema['gradebookapi_files'] = array(
+    'fields' => array(
+      'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'fid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE),
+      'list'        => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny',
+                             'description' => t('Whether the file should be visibly listed on the grade note.'), ),
+      'description' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+    ),
+    'indexes' => array(
+      'nid' => array('nid'),
+      'uid' => array('uid'),
+      'fid' => array('fid'),
+    ),
+    'primary key' => array('fid'),
+  );
+
+  $ret = array();
+  db_create_table($ret, 'gradebookapi_files', $schema['gradebookapi_files']);
+
+  // switch gradebook earned field to allow NULL (was NOT NULL in 6.x.1.x and earlier)
+  db_change_field($ret, 'gradebookapi_grade', 'earned', 'earned', array('type' => 'int', 'unsigned' => FALSE, 'not null' => FALSE));
+
   return $ret;
 }

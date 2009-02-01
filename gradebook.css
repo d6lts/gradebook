@@ -21,7 +21,7 @@
 
 .gradebook {
   width: 100%;
-  font-size: 70%;
+  font-size: 80%;
   border: 1px solid #ccc;
 }
 
@@ -34,9 +34,26 @@
 .gradebook .possible,
 .gradebook .date,
 .gradebook .title,
-.gradebook .edit-all {
+.gradebook .name,
+.gradebook .edit-all,
+.gradebook .exempt-box {
   border: 2px solid #ccc;
   text-align: center;
+}
+
+.gradebook .select {
+  border: 2px solid #ccc;
+  text-align: center;
+}
+
+.gradebook .earned-possible {
+  border: 2px solid #ccc;
+  text-align: center;
+}
+
+.gradebook .note {
+  border: 2px solid #ccc;
+  text-align: left;
 }
 
 .gradebook .average {
@@ -77,8 +94,7 @@
   color: #FF0000;
   font-size: 89%;
   font-style: italic;
-  padding-left: 1.5em;
-  padding-bottom: 1.5em;
+  padding: 1em 0 0 1em;
   text-align: left;
 }
 
@@ -90,8 +106,7 @@
   color: #FF0000;
   font-size: 89%;
   font-style: italic;
-  padding-top: 1.5em;
-  padding-left: 1.5em;
+  padding: 0 0 1em 1em;
   text-align: left;
 }
 

@@ -3,6 +3,7 @@ name = Gradebook
 description = "Provides a simple gradebook."
 package = Gradebook
 dependencies[] = gradebookapi
+dependencies[] = upload
 core = 6.x
 
 

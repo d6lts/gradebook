@@ -16,15 +16,20 @@ define gradebook categories (taxonomy terms) that can be unique for each gradebo
 Gradebook assignments can be created using one or more content types. Custom content
 types using CCK, or types supplied by other modules (such as Webform and others) that
 will only be used as gradebook assignments are good choices. Additional fields are added
-to assignment content types to allow the teacher to select the gradebook category and
-possible number of points for the assignment. Gradebook provides a gradebook page that
+to assignment content types to allow the teacher to select the gradebook category,
+the possible number of points for the assignment, the due date for the assignment, and
+the date to publish the assignment. Gradebook provides a gradebook page that
 lists all assignments that have been published, and tabulates grades by student. Teachers
 enter grades into the gradebook by clicking on cells within this table. This brings up an
-add grade form that also allows the teachers to leave a text note for the student, or exempt
+add grade form that also allows the teachers to leave a text note, attach one or more files
+(a critiqued paper, or graded assignment to be returned to the student), or exempt
 a student from an assignment. The assignment titles in the gradebook page are linked to
 the assignment node, so by clicking on the title, students and teachers can view the
-assignments.  Students are also able to access the gradebook page, where they can view
-(but not edit!) their own grades and the notes left by their teachers.
+assignments.  Students are also able to access the gradebook page where they can view
+(but not edit!) their own grades, notes left by their teachers, and download any attached
+files. There is also an option to allow students to attach their own files (assignments to
+be graded, responses to grading, revisions). Finally, each gradebook can be exported and
+saved to a text or spreadsheet file.
 
 This module is under active development, so feature requests are still possible and would be
 appreciated.
@@ -56,10 +61,17 @@ gradebook administrator can take over, if desired.
    and students who will be using the gradebook. This is done through the Drupal 
    administration menu (User Management >> Roles)
 
-   a. The Gradebook module provides 'admin gradebook' permissions. This permission is 
+   a. The Gradebook module provides 'admin gradebook', 'access gradebook', and 'attach files 
+      to gradebook'  permissions. The 'admin gradebook' permission is 
       necessary to allow a user to add, edit, and view gradebooks from the administration 
       page (admin/gradebook/gradebook). Its also needed for assigning gradebook students
       and teachers to the available Drupal roles, as well as for general gradebook settings.
+      'access gradebook' is needed to allow any user to view the gradebook. This can be used 
+      to keep the gradebook hidden from anonymous, for example.  Finally, the 'attach files...'
+      permission allows specific Drupal roles permission to attach files, whether they are
+      teachers, administrators, students or whatever you like. Note that for teachers and 
+      students, its more convenient to grant this permission from the Gradebook Settings page 
+      at Administer >> Gradebook >> Gradebooks >> Settings  (admin/gradebook/gradebook/settings).
 
    b. The Gradebook API modeule provides 'admin gradebook api' permissions. This permissions
       allows the user to configure the gradebook module, determining what content types are 
@@ -72,17 +84,21 @@ gradebook administrator can take over, if desired.
 	  3. Node Module:   create assignment content types
 	  4. 'admin gradebook' 
       ii. Teachers:
-	  1. Create and access content . at least the assignment types
-	  2. The module will permit them to set up, modify, and add to gradebooks created by
-             the Gradebook administrator.
+	  1. 'create ...' - at least the assignment types.
+	  2. 'access gradebook'
+          3. The module will permit them to set up, modify, and add to gradebooks created by
+             the Gradebook administrator according to their role.
      iii. Students: 
-	  1. No additional permissions needed
-	  2. The module will make sure they can only see their own grades. 
-    d. As usual, the system administrator with User Id = 1 can do anything
+	  1. 'access gradebook'
+          2. The module will make sure they can only see their own grades and files intended for them.
 
-2. Go to Gradebook >> Settings and check the roles that will be used for Teachers and 
-   Students. On the same page you can designate the text to be used for an ungraded assignment
-  (default is --), as well as the number of gradebooks to display on the page (default is 25).
+   d. As usual, the system administrator with User Id = 1 can do anything
+
+2. Go to Administer >> Gradebook >> Gradebooks >> Settings  (admin/gradebook/gradebook/settings) and check 
+   the roles that will be used for Teachers and Students. You can also designate general gradebook 
+   settings, including permissions for students and teachers to attach files to grades, the text to be 
+   used for an ungraded assignment (default is --), as well as the number of gradebooks to display on 
+   the gradebook list page (default is 25), and the number of grades to display on the gradebook page.
 
 3. If you haven't already set up a new content type for assignments, you probably will want
    to do that next. The Gradebook module will add two fields to these assignment pages (One 
@@ -96,6 +112,10 @@ gradebook administrator can take over, if desired.
 4. Go to Administer >> Gradebook >> GradebookAPI to specify the content type(s) to use for 
    assignments. Checking these boxes will enable the form elements described in 1 on these 
    assignments, so only select assignment content types.
+
+5. On the same page, choose an appropriate default time between creation of assignment node and 
+   due date. The actual due date will be selected on the assignment form, but its easier to work
+   with if the select form starts at a reasonable date.
 
 III.  Usage (for students and teachers)
 ----------------
@@ -114,14 +134,29 @@ III.  Usage (for students and teachers)
          another (so Quiz >> type1,  Quiz >> type2, etc.  are possible).  
    b. View individual assignments by clicking on the assignment name
    c. Edit a student's grades (by clicking on the 'ungraded' text (--) in the grade list. 
-      [Note that sometimes it's not clear that this is a link.] 
+      [Note that, depending on your theme, sometimes it's hard to tell that this is a link.] 
       ii. Assign a value for the student's score
       iii. Add a note that the student will be able to see when viewing their grades
       iv. Exempt a student from the assignment, by checking the box. When this box is checked,
           the scores for the assignment are not used to calculate the student's grade.
-4. If as student clicks on their grade, they are brought to a grade summary page, which 
-   includes the assignment data as well as any note entered by the teacher. There is a link
-   at the bottom of this page to bring the student back to the gradebook. 
+       v. Attach a file for the student to view.
+      vi. Click 'Save All' to save the grade and return to the gradebook page.
+4. If a student clicks on their grade, they are brought to a grade summary page, which 
+   includes the assignment data as well as the note and linked files, provided by the teacher. 
+   With proper permission, students will also be able to attach files to their grade. A button 
+   at the bottom of this page brings the student back to the gradebook. 
+
+5. The teacher will also see [edit-all] in the table header under each assignment. This link brings
+   up a grade entry form listing each student's grade data for the assignment. To attach a file to 
+   one of the grades, first select the grade by clicking on the radio button in the left column.
+   Note that if there is only one student, radio buttons will not appear. Then, browse to find the
+   file and finally press the attach button to add the file to the grade record. Changes will not
+   be committed until the 'Save All' button is pressed. A button is also provided to return to the
+   gradebook page without saving.
+
+6. The teacher can also view or edit all grade information for a particular student by clicking on 
+   the student's name.  This link brings up a grade entry form like that discussed in 5. Follow the
+   same procedures to update all grade data for the student.   
 
 IV. Developer notes
 -----------------------
@@ -131,7 +166,7 @@ IV. Developer notes
 3. Discussion and Development on Drupal Groups at http://groups.drupal.org/soc-gradebook
 4. Drupal in Education on Drupal Groups at http://groups.drupal.org/drupal-education
 5. Drupal in Education discussion of Gradebook at http://groups.drupal.org/node/6447
-6. Others? 
+6. The gradebook display can be modified from gradebook.css.
 
 V.  Authors
 --------------
