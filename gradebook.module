@@ -397,24 +397,24 @@ function _gradebook_parent_select($root, $tid, $title) {
  *
  */
 
-function gradebook_get_sorted_assignments($gradebook, $tids, $order, $sort) {
+function gradebook_get_sorted_assignments($gradebook, $tids, $pager, $order, $sort) {
 
   switch ($order) {
     case 'title':
-      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, TRUE, 'n.title '. $sort);
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, $pager, 'n.title '. $sort);
       break;
     case 'due':
-      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, TRUE, 'a.due_date '. $sort);
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, $pager, 'a.due_date '. $sort);
       break;
     case 'publish':
-      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, TRUE, 'a.publish_date '. $sort);
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, $pager, 'a.publish_date '. $sort);
       break;
     case 'possible':
-      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, TRUE, 'a.possible '. $sort);
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, $pager, 'a.possible '. $sort);
       break;
     case 'category':
     default:
-      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, TRUE, 'td.name '. $sort);
+      $result = gradebookapi_select_nodes($gradebook, $tids, 'or', 0, $pager, 'td.name '. $sort);
   }
 
   $assignments = array();
@@ -458,7 +458,10 @@ function gradebook_gradebook_page($gradebook, $uid = NULL, $export = FALSE) {
 // MN: Problems here with $tids not being defined - breaks E_ALL compliance
 //     for now, set it equal to an empty array.
   $tids = array();
-  $assignments = gradebook_get_sorted_assignments($gradebook, $tids, $order, $sort);
+
+// Note: don't use pager on export
+
+  $assignments = gradebook_get_sorted_assignments($gradebook, $tids, !$export, $order, $sort);
 
   if (!empty($uid)) {
     $result = db_query("SELECT uid, name FROM {users} WHERE uid=%d", $uid);
@@ -541,15 +544,15 @@ function theme_gradebook_page($gradebook, $assignments, $student_grades, $export
     if ($export) {
       $headers['category'][] = $category;
       $headers['possible'][] = $assignment->possible;
-      $headers['publish'][]  = format_date($assignment->publish_date, 'custom', 'Y/m/d');
-      $headers['due'][]      = format_date($assignment->due_date, 'custom', 'Y/m/d');
+      $headers['publish'][]  = format_date($assignment->publish_date, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y'));
+      $headers['due'][]      = format_date($assignment->due_date, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y'));
       $headers['title'][]    = $assignment->title;
     }
     else {
       $headers['category'][] = array('data' => $category, 'class' => 'category');
       $headers['possible'][] = array('data' => $assignment->possible, 'class' => 'possible');
-      $headers['publish'][]  = array('data' => format_date($assignment->publish_date, 'custom', 'Y/m/d'), 'class' => 'date');
-      $headers['due'][]      = array('data' => format_date($assignment->due_date, 'custom', 'Y/m/d'), 'class' => 'date');
+      $headers['publish'][]  = array('data' => format_date($assignment->publish_date, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y')), 'class' => 'date');
+      $headers['due'][]      = array('data' => format_date($assignment->due_date, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y')), 'class' => 'date');
       $headers['title'][]    = array('data' => l($assignment->title, 'node/'. $assignment->nid), 'class' => 'title');
 
       if (gradebookapi_is_teacher($gradebook)) {
@@ -725,4 +728,79 @@ function theme_gradebook_table($headers, $rows, $attributes = array(), $caption 
 
   $output .= "</tbody></table>\n";
   return $output;
+}
+
+/**
+ * Implementation of hook_block().
+ */
+function gradebook_block($op = 'list', $delta = 0) {
+  switch ($op) {
+    case 'list':
+      return _gradebook_block_list();
+    case 'view':
+      return _gradebook_block_view($delta);
+  }
+}
+
+/**
+ * Get the list of the blocks.
+ *
+ * @param
+ *   none.
+ *
+ * @return
+ *   array containing the title ("info") of the block.
+ */
+function _gradebook_block_list() {
+  $block = array();
+  $block[0]['info'] = t('My Assignments');
+  return $block;
+}
+
+/**
+ * Get the output to be displayed by the block.
+ *
+ * @param
+ *   $delta - integer for the block number.
+ *
+ * @return
+ *   array containing the title ("subject") and content of the block.
+ */
+function _gradebook_block_view($delta) {
+  $block = array();
+  switch ($delta) {
+    case 0:
+      $block['subject'] =  t('Current Assignments');
+      // get all assignments for user and display in a block
+      $now = time();
+      $start = '<ul>';  // TODO: add css classes
+      $stop  = '</ul>';
+      $vid = gradebookapi_get_vid();
+      $result = db_query('SELECT DISTINCT t.tid FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = %d', $vid);
+      while ($tid = db_result($result)) {
+        $gradebook = gradebookapi_gradebook_load($tid);
+        if (gradebookapi_is_student_or_teacher($gradebook)) {
+          $header = t('%gradebook_name:', array('%gradebook_name' => $gradebook->name));
+          // get assignments
+          $assignments = array();
+          $tids = array();
+          $assignments = gradebook_get_sorted_assignments($gradebook, $tids, FALSE, 'due', '');
+          $items = '';
+          foreach ($assignments as $assignment) {
+            if ($now <= $assignment->due_date) {
+              $items .= '<li>'. l($assignment->title, 'node/'. $assignment->nid) .' ('. $assignment->possible .') ';
+              $items .= '<br />Due: '. format_date($assignment->due_date, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y')) .'</li>';
+            }
+          }
+          if ($items != '') {
+            $block['content'] .= $header . $start . $items . $stop;
+          }
+        }
+      }
+      if (!empty($block['content'])) {
+        $block['content'] = '<div class="gradebook_block">'. $block['content'] .'</div>';
+      }
+      break;
+  }
+  return $block;
 }

@@ -78,7 +78,7 @@ function gradebookapi_user($op, &$edit, &$account, $category = NULL) {
     // check to see if $account is a student in each gradebook
     $student_in_any_gradebook = FALSE;
     $vid = gradebookapi_get_vid();
-    $result = db_query('SELECT DISTINCT t.tid, FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = %d', $vid);
+    $result = db_query('SELECT DISTINCT t.tid FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = %d', $vid);
     while ($tid = db_result($result)) {
       $gradebook = gradebookapi_gradebook_load($tid);
       if (gradebookapi_is_student($gradebook, $account)) {
@@ -282,7 +282,7 @@ function _gradebookapi_select_nodes($tids = array(), $operator = 'or', $depth = 
       $result = pager_query($sql, variable_get('gradebook_grades_per_page', 10), 0, $sql_count);
     }
     else {
-      $result = db_query_range($sql, 0, variable_get('feed_default_items', 25));
+      $result = db_query($sql);  // get all records not a range 
     }
   }
 
@@ -402,7 +402,7 @@ function gradebookapi_set_grade($grade) {
   }
 
   if (is_numeric($grade->earned)) {  // trying to restore null status, rather than 0.
-    db_query("UPDATE {gradebookapi_grade} SET earned = %d WHERE uid=%d AND nid=%d", $grade->earned, $grade->uid, $grade->nid);
+    db_query("UPDATE {gradebookapi_grade} SET earned = %f WHERE uid=%d AND nid=%d", $grade->earned, $grade->uid, $grade->nid);
   } 
   else {  // allow a grade to be returned to null status
     db_query("UPDATE {gradebookapi_grade} SET earned = NULL WHERE uid=%d AND nid=%d", $grade->uid, $grade->nid);
@@ -549,7 +549,7 @@ function gradebookapi_calc_grades($uid, $tid, $recursive=TRUE) {
     }
 
     // cache grade
-    db_query("INSERT INTO {gradebookapi_cache} (uid, tid, earned, possible) VALUES (%d, %d, %d, %d)", $uid, $tid, $earned, $possible);
+    db_query("INSERT INTO {gradebookapi_cache} (uid, tid, earned, possible) VALUES (%d, %d, %f, %f)", $uid, $tid, $earned, $possible);
 
     if ($recursive) {
       // recalc parents
@@ -709,8 +709,14 @@ function gradebookapi_assignment_load($node) {
  *  @return NONE
  */
 function gradebookapi_assignment_insert($node) {
-  $node->publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
-  $node->due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
+  if (_gradebookapi_usedateapi()) {
+    $node->publish_date = _gradebookapi_datepopup2unixtime($node->publish_date);
+    $node->due_date = _gradebookapi_datepopup2unixtime($node->due_date);
+  }
+  else {
+    $node->publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
+    $node->due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
+  }
 
   $now = time();
   if ($now > $node->publish_date) {
@@ -720,7 +726,7 @@ function gradebookapi_assignment_insert($node) {
     $node->status = 0;
   }
 
-  db_query("INSERT INTO {gradebookapi_assignment} (nid, possible, publish_date, due_date) VALUES (%d, %d, '%d', '%d')", $node->nid, $node->possible, $node->publish_date, $node->due_date);
+  db_query("INSERT INTO {gradebookapi_assignment} (nid, possible, publish_date, due_date) VALUES (%d, %f, '%d', '%d')", $node->nid, $node->possible, $node->publish_date, $node->due_date);
 
   // we have to manually update terms as we can't control module order
 
@@ -739,9 +745,14 @@ function gradebookapi_assignment_insert($node) {
  *  @return NONE
  */
 function gradebookapi_assignment_update(&$node) {
-  $node->publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
-  $node->due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
-
+  if (_gradebookapi_usedateapi()) {
+    $node->publish_date = _gradebookapi_datepopup2unixtime($node->publish_date);
+    $node->due_date = _gradebookapi_datepopup2unixtime($node->due_date);
+  }
+  else {
+    $node->publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
+    $node->due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
+  }
   if (db_result(db_query('SELECT * FROM {gradebookapi_assignment} a WHERE a.nid = %d', $node->nid))) {
     db_query("UPDATE {gradebookapi_assignment} SET possible = '%s', publish_date = '%d', due_date = '%d'  WHERE nid = %d", $node->possible, $node->publish_date, $node->due_date, $node->nid); 
   }
@@ -869,7 +880,7 @@ function gradebookapi_assignment_form_elements($node) {
     '#title' => t('Assignment Settings'),
     '#tree' => FALSE,
     '#weight' => 0,
-    //'#validate' => array('gradebookapi_assignment_validate' => array()),
+    '#validate' => array('gradebookapi_assignment_validate' => array()),
   );
   $form['gradebookapi']['possible'] = array(
     '#type' => 'textfield',
@@ -893,23 +904,31 @@ function gradebookapi_assignment_form_elements($node) {
     '#collapsible' => FALSE,
     '#title' => t('Assignment dates'),
     '#weight' => -8,
-    );
+  );
 
   $form['gradebookapi']['dates']['due_date'] = array(
     '#prefix' => '<div class="date_widget">',
     '#suffix' => '</div>',
-    '#type' => 'date',
+    '#type' => _gradebookapi_usedateapi() ? 'date_popup': 'date',
     '#title' => t('Assignment due date'),
-    '#default_value' => is_array($node->due_date) ? $node->due_date : _gradebookapi_unixtime2drupaldate($node->due_date),
-    );
+    '#default_value' => is_numeric($node->due_date) ?  ( _gradebookapi_usedateapi() ? _gradebookapi_unixtime2datepopup($node->due_date) : _gradebookapi_unixtime2drupaldate($node->due_date)) : $node->due_date,
+    '#date_label_position' => 'within',
+    '#date_increment' => 15,
+    '#date_year_range' => '-3:+3',
+    '#date_format' => 'Y-m-d H:i',
+  );
 
   $form['gradebookapi']['dates']['publish_date'] = array(
     '#prefix' => '<div class="date_widget">',
     '#suffix' => '</div>',    
-    '#type' => 'date',
+    '#type' => _gradebookapi_usedateapi() ? 'date_popup': 'date',
     '#title' => t('Publish date'),
-    '#default_value' => is_array($node->publish_date) ? $node->publish_date : _gradebookapi_unixtime2drupaldate($node->publish_date),
-    );
+    '#default_value' => is_numeric($node->publish_date) ?  ( _gradebookapi_usedateapi() ? _gradebookapi_unixtime2datepopup($node->publish_date) : _gradebookapi_unixtime2drupaldate($node->publish_date)) : $node->publish_date,
+    '#date_label_position' => 'within',
+    '#date_increment' => 15,
+    '#date_year_range' => '-3:+3',
+    '#date_format' => 'Y-m-d H:i',
+  );
   $form['#submit'][] = 'gradebookapi_assignment_submit';
 
   $oldtax = $node->taxonomy;
@@ -938,13 +957,17 @@ function gradebookapi_assignment_form_elements($node) {
  *  @return NONE
  */
 function gradebookapi_assignment_validate($node, $form = NULL) {
+
   if ($node) {
-    // safe int check
-    if (is_numeric($node->possible) ? intval($node->possible) != $node->possible : TRUE) {
-      form_set_error('possible', t('The possible value for the assignment must be an integer.'));
+    if (_gradebookapi_usedateapi()) {
+      $due_date =  _gradebookapi_datepopup2unixtime($node->due_date);
+      $publish_date = _gradebookapi_datepopup2unixtime($node->publish_date);
     }
-    $due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
-    $publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
+    else {
+      $due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
+      $publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
+    }
+
     if ($publish_date >= $due_date) {
       form_set_error('publish_date', t('The publish date of an assignment must be before its due date.'));
     }
@@ -956,12 +979,16 @@ function gradebookapi_assignment_validate($node, $form = NULL) {
  * This checks if the assignment should be marked as published.
  */
 function gradebookapi_assignment_submit($form, &$form_state) {
-
-  $publish_date = _gradebookapi_drupaldate2unixtime($form_state['values']['publish_date']);
-  $due_date = _gradebookapi_drupaldate2unixtime($form_state['values']['due_date']);
+  if (_gradebookapi_usedateapi()) {
+      $due_date = _gradebookapi_datepopup2unixtime($form_state['values']['due_date']);
+      $publish_date = _gradebookapi_datepopup2unixtime($form_state['values']['publish_date']);
+  }
+  else {
+    $due_date = _gradebookapi_drupaldate2unixtime($form_state['values']['due_date']);
+    $publish_date = _gradebookapi_drupaldate2unixtime($form_state['values']['publish_date']);
+  }
 
   $now = time();
-
   $form_state['values']['status'] = ($now >= $publish_date);
   if ($form_state['values']['status']) {
     drupal_set_message(t('The assignment is currently active.'));
@@ -978,8 +1005,6 @@ function gradebookapi_assignment_submit($form, &$form_state) {
  */
 function gradebookapi_form_alter(&$form, $form_state, $form_id) {
   if (isset($form['type']) && $form['type']['#value'] .'_node_form' == $form_id) {
-
-//    print_r($form);
     $node = $form['#node'];
     $types = gradebookapi_get_assignment_types();
 
@@ -1170,9 +1195,14 @@ function gradebookapi_cron() {
  *
  */
 function _gradebookapi_assignment_status(&$node) {
-  $node->publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
-  $node->due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
-
+  if (_gradebookapi_usedateapi()) {
+    $node->publish_date = _gradebookapi_datepopup2unixtime($node->publish_date);
+    $node->due_date = _gradebookapi_datepopup2unixtime($node->due_date);
+  }
+  else {
+    $node->publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
+    $node->due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
+  }
   $now = time();
   if ($now > $node->publish_date) {
     $node->status = 1;
@@ -1198,10 +1228,20 @@ function _gradebookapi_drupaldate2unixtime($drupal_date) {
 }
 
 function _gradebookapi_unixtime2drupaldate($unixtime) {
-  $unixtime -= _gradebookapi_get_timezone;
+  $unixtime -= _gradebookapi_get_timezone();
   return array('day' => gmdate('j', $unixtime),
     'month' => gmdate('n', $unixtime),
     'year' => gmdate('Y', $unixtime));
+}
+
+function _gradebookapi_datepopup2unixtime($popup_date) {
+  // TODO: Consider timezone for popup? If so, what does the form element need to be to make it work?
+  return strtotime($popup_date);
+}
+
+function _gradebookapi_unixtime2datepopup($unixtime) {
+// TODO: Consider timezone for popup? If so, what does the form element need to be to make it work?
+  return gmdate("Y-m-d H:i", $unixtime);
 }
 
 /**
@@ -1215,7 +1255,12 @@ function _gradebookapi_unixtime2drupaldate($unixtime) {
  */
 function theme_gradebookapi_assignment_due_date($due_date) {
   $output = '<div class="gradebook-assignment-due">'. t('Assignment is due on') .' ';
-  $output .= '<span class="gradebook-assignment-due-date">'. format_date($due_date, 'custom', 'F j, Y') .'</span>';
+  $output .= '<span class="gradebook-assignment-due-date">'. format_date($due_date, 'custom', 'F j, Y');
+  $output .= t(' at ') . format_date($due_date, 'custom', 'h:i a') .'</span>';
   $output .= '</div>';
   return $output;
+}
+
+function _gradebookapi_usedateapi() {
+  return (module_exists('date_api') && variable_get('gradebookapi_use_dateapi', FALSE));
 }

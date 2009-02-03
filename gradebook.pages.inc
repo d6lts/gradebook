@@ -68,7 +68,7 @@ function gradebook_grade_student_page($gradebook, $uid) {  // access is limited 
   if (gradebookapi_is_student($gradebook, $account)) {
     // get assignments
     $tids = array();
-    $assignments = gradebook_get_sorted_assignments($gradebook, $tids, $order, $sort);
+    $assignments = gradebook_get_sorted_assignments($gradebook, $tids, $order, TRUE, $sort);
 
     // get grades for assignments
     $grades = array();
@@ -229,18 +229,11 @@ function gradebook_upload_form_attach_another($form, &$form_state) {
   $form_state['rebuild'] = TRUE;
 }
 
+/* 
+ * No validation is needed for floating point grades, but saving this function for future development.
+ */
 function gradebook_grade_form_validate($form, &$form_state) {
-  if ($form_state['values']['teacher']) {
-    $keys = element_children($form_state['values']['grade']);
-    foreach ($keys as $key) {
-      if (isset($form_state['values']['grade'][$key]['earned']) && $form_state['values']['grade'][$key]['earned'] != '') {
-        $earned = $form_state['values']['grade'][$key]['earned'];
-        if (is_numeric($earned) ? intval($earned) != $earned : TRUE) {
-          form_set_error('grade]['. $key .'][earned', t('The earned value for the assignment must be an integer.'));
-        }
-      }
-    }
-  } // nothing to validate unless user can modify grade values.
+// do nothing
 }
 
 function gradebook_grade_form_cancel($form, &$form_state) {
@@ -297,7 +290,7 @@ function theme_gradebook_grade_form(&$form) {
 
     $keys = element_children($form['grade'][$id]['attachments']['files']);
 
-    if (count($keys) > 0) {  // show attachment block if files are attached
+    if (count($keys) > 0) {  // show attachment table if files are attached
       $attachment_header = array(t('Attachment'), t('Link'), t('List'), t('Remove'));
       $attachment_rows = NULL;
       foreach ($keys as $key) {

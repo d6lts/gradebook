@@ -1,30 +1,46 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-02-02
+----------------------
+* by MGN: Modified earned and possible fields in gradebookapi database tables to be of type float
+  instead of int. This will make future grade conversions/scales easier to implement later
+  and allows for fractional points now.
+* by MGN: Implemented hook_block to provide a block that lists all the current assignments for a 
+  student or teacher that will be due in the future. The list is sorted by gradebook and
+  then by due date. The assignment titles are given, along with the total possible points 
+  and the date due. The assignment title links to the assignment node.
+* by MGN: To allow finer control over the date settings (hours and minutes), I implemented a date_popup 
+  element from the date api. I don't want to require dateapi for this module, so its an 
+  optional feature. On the gradebookapi admin screen there is a checkbox which will enable the 
+  use of date_popup on the assignment forms. Leave it unchecked if you don't want it.
+* by MGN: Added a custom date format element to the gradebookapi admin form. This optionally sets the 
+  date format used in the assignment block and and on the gradebook page.
+
 Gradebook 6.x.2.x-dev, 2009-01-31
 ----------------------
-- #367150 by MGN: Added file attachments for gradebook entries for teachers and students. 
+* #367150 by MGN: Added file attachments for gradebook entries for teachers and students. 
   This necessitated a new table gradebookapi_files, so its important to run update.php when 
   upgrading. Also, many changes to gradebookapi to load, remove and otherwise manage these 
   files. Added general gradebook configuration to allow students, teachers or both to attach files.
-- #367154 by MGN: Fixed pager support for  gradebook pages with many assignments or edit forms 
+* #367154 by MGN: Fixed pager support for  gradebook pages with many assignments or edit forms 
   with many grade entries. Added general gradebook configuration of the number of grades to display 
   on a gradebook page.
-- by MGN: Redesigned grade_assigment_page and grade_student_page to call the same gradebook_grade_form. 
+* by MGN: Redesigned grade_assigment_page and grade_student_page to call the same gradebook_grade_form. 
   Less code to manage and a more consistent, uniform css-styled UI.
-- by MGN: Changed the {gradebookapi_grade} 'earned' field so it can be null. This allows for grades to be 
+* by MGN: Changed the {gradebookapi_grade} 'earned' field so it can be null. This allows for grades to be 
   reset to null when the grade is edited, if desired. It was previously being reset to 0. This 
   also required a couple of minor changes to the gradebookapi_calc_grades function because earned 
   can be null even when $grade is not.
-- by MGN: Updated README.txt to explain new features.
+* by MGN: Updated README.txt to explain new features.
 
 Gradebook 6.x.2.x-dev, 2009-01-20
 ----------------------
-- #360414 by MGN: Added new feature to delete gradebook grades when account is deleted.
+* #360414 by MGN: Added new feature to delete gradebook grades when account is deleted.
 
 Gradebook 6.x.2.x-dev, 2009-01-1
 ----------------------
-- by MGN: added access gradebook permission.
-- #360407 by MGN: added export gradebook feature, borrowing heavily from the webform module. This 
+* by MGN: added access gradebook permission.
+* #360407 by MGN: added export gradebook feature, borrowing heavily from the webform module. This 
   adds a menu local item to export the gradebook to Excel or text file. Most of the new code is in 
   two include file gradebook_report.inc and gradebook_export.inc. To avoid code duplication, 
   gradebook_gradebook_page() was modified to return rows for a text table when called with the 
@@ -32,79 +48,79 @@ Gradebook 6.x.2.x-dev, 2009-01-1
 
 Gradebook 6.x.2.x-dev, 2009-01-17
 ----------------------
-- by MGN: rewrote hook_gradebookapi_teachers and hook_gradebookapi_students so creating a new drupal 
+* by MGN: rewrote hook_gradebookapi_teachers and hook_gradebookapi_students so creating a new drupal 
   role does not automatically give it teacher and student status. Also separated out common code into 
   a helper function _gradebook_gradebookapi_role to avoid code duplication.
 
 Gradebook 6.x.2.x-dev, 2009-01-13
 ----------------------
-- #358236 by MGN: incorrect use of url() in form redirect.
+* #358236 by MGN: incorrect use of url() in form redirect.
 
 Gradebook 6.x.2.x-dev, 2009-01-08
 ----------------------
-- by MGN: updating README.txt
+* by MGN: updating README.txt
 
 Gradebook 6.x.2.x-dev, 2009-01-07
 ----------------------
-- Added two forms to improve UI: 
--   * grade all students for a select assignment, and grade all assignments for a selected student
-- Added div ID's for form elements to permit form layout through CSS (not yet implemented in gradebook.css)
-- split off page callbacks into either gradebook.pages.inc (display/edit grade) or gradebook.category.inc
+* Added two forms to improve UI: 
+    * grade all students for a select assignment, and grade all assignments for a selected student
+* Added div ID's for form elements to permit form layout through CSS (not yet implemented in gradebook.css)
+* split off page callbacks into either gradebook.pages.inc (display/edit grade) or gradebook.category.inc
   or gradebook.category.inc (gradebook categories) to reduce size of gradebook.module
-- reworked theme_gradebook_page and gradebook.css to improve css control of formating on gradebook_page
-- Added assignment class average row to gradebook_page
+* reworked theme_gradebook_page and gradebook.css to improve css control of formating on gradebook_page
+* Added assignment class average row to gradebook_page
 
 Gradebook 6.x.2.x-dev, 2009-01-01
 ----------------------
-- Fixed several incorrect arguments to taxonomy functions (changed between Drupal v5 and v6).
-- Added a check in gradebookapi_assignment_update to make sure table has a record of the assignment. 
-- Adjusted access arguments for admin/gradebook.
-- Relocated code to calculate term grade when an assignment changes categories.
+* Fixed several incorrect arguments to taxonomy functions (changed between Drupal v5 and v6).
+* Added a check in gradebookapi_assignment_update to make sure table has a record of the assignment. 
+* Adjusted access arguments for admin/gradebook.
+* Relocated code to calculate term grade when an assignment changes categories.
 
 Gradebook 6.x.2.x-dev, 2008-12-30
 ----------------------
-- Created a 6.x.2.x new features branch 
-- Added date support for assignments by modifying code from the announcement module
+* Created a 6.x.2.x new features branch 
+* Added date support for assignments by modifying code from the announcement module
 
 Gradebook 6.x.1.x-dev, 2008-12-26
 ----------------------
-- Fixed mistaken use of is_null() when !empty() should have been used.
-- Clarified documentation of students and teacher roles when using og_gradebook. 
-- Allow sitewide student and teacher roles to be optional so it works correctly with og_gradebook.
+* Fixed mistaken use of is_null() when !empty() should have been used.
+* Clarified documentation of students and teacher roles when using og_gradebook. 
+* Allow sitewide student and teacher roles to be optional so it works correctly with og_gradebook.
 
 Gradebook 6.x.1.x-dev, 2008-12-12
 ----------------------
-- Added embedded help via hook_help() in gradebook and gradebookapi
+* Added embedded help via hook_help() in gradebook and gradebookapi
 
 Gradebook 6.x.1.x-dev, 2008-12-10
 ----------------------
-- Modified css to add scrollbars to gradebook page to help UI for now - definitely needs improvement
-- Modified column order in theme_gradebook_page so total grade is next to student name
-- Separated out admin pages into .admin.inc files to reduce module footprint
+* Modified css to add scrollbars to gradebook page to help UI for now * definitely needs improvement
+* Modified column order in theme_gradebook_page so total grade is next to student name
+* Separated out admin pages into .admin.inc files to reduce module footprint
 
 Gradebook 6.x.1.x-dev, 2008-12-9
 ----------------------
-- [#340596] - extended initial patch to recalculate correctly when assignment is moved between categories
-- 6.x port is more or less complete with full functionality
+* [#340596] - extended initial patch to recalculate correctly when assignment is moved between categories
+* 6.x port is more or less complete with full functionality
 
 Gradebook 6.x.1.x-dev, 2008-12-7
 ----------------------
-- Over the last week I've worked through found a series of bugs in the 5.x.1.x code
-- Mostly just figuring out the logic of the module - definitely need to add documentation
-- [#340596] - patches to fix gradebook_term grades so they recalculate correctly when grade category is modified
+* Over the last week I've worked through found a series of bugs in the 5.x.1.x code
+* Mostly just figuring out the logic of the module - definitely need to add documentation
+* [#340596] - patches to fix gradebook_term grades so they recalculate correctly when grade category is modified
 
 Gradebook 6.x.1.x-dev, 2008-11-29
 ----------------------
-- Found a series of real bugs in the 5.x.1.x code - posting questions on gradebook issue queue
+* Found a series of real bugs in the 5.x.1.x code - posting questions on gradebook issue queue
 
 Gradebook 6.x.1.x-dev, 2008-11-28
 ----------------------
-- gradebookapi debugging complete - seems to function ok
-- begin working on gradebook.module
-- following the 5.x to 6.x guide to module updates in the handbook and coder
+* gradebookapi debugging complete - seems to function ok
+* begin working on gradebook.module
+* following the 5.x to 6.x guide to module updates in the handbook and coder
 
 Gradebook 6.x.1.x-dev, 2008-11-27
 ----------------------
-- Began port of 5.x.1.x-dev
-- implemented hook_schema() for gradebookapi.install file
-- began updating hook_menu() and forms to D6 FAPI
+* Began port of 5.x.1.x-dev
+* implemented hook_schema() for gradebookapi.install file
+* began updating hook_menu() and forms to D6 FAPI

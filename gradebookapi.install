@@ -14,7 +14,7 @@ function gradebookapi_schema() {
   $schema['gradebookapi_assignment'] = array(
     'fields' => array(
       'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
-      'possible'    => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'possible'    => array('type' => 'float', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
       'publish_date' => array(
         'description' => 'Date assignment becomes effective.',
         'type' => 'int',
@@ -39,7 +39,7 @@ function gradebookapi_schema() {
     'fields' => array(
       'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
-      'earned'      => array('type' => 'int', 'unsigned' => FALSE, 'not null' => FALSE),
+      'earned'      => array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE),
       'exempt'      => array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'size' => 'tiny', 'default' => 0),
       'timestamp'   => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'note'        => array('type' => 'text', 'unsigned' => FALSE, 'not null' => FALSE, 'size' => 'big'),
@@ -51,8 +51,8 @@ function gradebookapi_schema() {
     'fields' => array(
       'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'tid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
-      'earned'      => array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
-      'possible'    => array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
+      'earned'      => array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE),
+      'possible'    => array('type' => 'float', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
     ),
     'primary key' => array('tid', 'uid'),
   );
@@ -151,6 +151,18 @@ function gradebookapi_update_6002() {
 
   // switch gradebook earned field to allow NULL (was NOT NULL in 6.x.1.x and earlier)
   db_change_field($ret, 'gradebookapi_grade', 'earned', 'earned', array('type' => 'int', 'unsigned' => FALSE, 'not null' => FALSE));
+
+  return $ret;
+}
+
+function gradebookapi_update_6003() {
+  $ret = array();
+
+  // switch earned and possible fields to type float to allow fractional point assignments (was formerly int)
+  db_change_field($ret, 'gradebookapi_grade', 'earned', 'earned', array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE));
+  db_change_field($ret, 'gradebookapi_assignment', 'possible', 'possible', array('type' => 'float', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0));
+  db_change_field($ret, 'gradebookapi_cache', 'earned', 'earned', array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE));  
+  db_change_field($ret, 'gradebookapi_cache', 'possible', 'possible', array('type' => 'float', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0));
 
   return $ret;
 }

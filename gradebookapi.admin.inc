@@ -33,7 +33,7 @@ function gradebookapi_admin_settings() {
     '+3 month' => t('3 months'),
     '+6 month' => t('6 months'),
     '+1 year' => t('1 year'),
-    );
+  );
 
   $form['gradebookapi_assignments_interval'] = array(
     '#type' => 'radios',
@@ -44,7 +44,24 @@ function gradebookapi_admin_settings() {
     '#required' => FALSE,
     '#prefix' => '<div class="gradebookapi-radios">',
     '#suffix' => '</div><div class="clear-block"></div>',
-    );
+  );
+
+  $usedateapi = module_exists('date_api');
+  $form['gradebookapi_use_dateapi'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Use Date Popup for date selection'),
+    '#description' => $usedateapi ? t('Date API is enabled, check the box if you would like to use Date Popup for date selection.') : t('Date API is not available. Install and enable Date API for this feature.'),
+    '#default_value' => $usedateapi ? variable_get('gradebookapi_use_dateapi', FALSE) : FALSE,
+    '#disabled' => !$usedateapi,
+  ); 
+ 
+  $form['gradebookapi_assignments_date_format'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Date format to use on gradebook page and block'),
+    '#default_value' => variable_get('gradebookapi_assignments_date_format', 'm/d/Y'),
+    '#description' => t('Define a php date format string like "m/d/Y". See <a href="@php-net-url">http://php.net/date</a> for more details.', array('@php-net-url' => url("http://php.net/date"))),
+    '#required' => FALSE,
+  );
 
   return system_settings_form($form);
 }
@@ -66,14 +83,6 @@ function gradebookapi_admin_settings_submit($form, &$form_state) {
       watchdog('gradebook', 'Updated vocabulary %name.', array('%name' => $vocabulary->name), WATCHDOG_NOTICE, l(t('edit'), 'admin/content/taxonomy/edit/vocabulary/'. $vid));
       break;
   }
-  $form_state['redirect'] = 'admin/gradebook';
+  $form_state['redirect'] = 'admin/gradebook/gradebookapi';
 
-// TODO: look over this code
-  // rebuild grades in each gradebook
-  //$terms = taxonomy_get_tree($vid, 0, -1, 1);
-  //foreach ($terms as $term) {
-  //  gradebookapi_rebuild_grades($term->tid);
-  //}
-
-  //drupal_set_message(t('Updated gradebookapi settings.'));
 }
