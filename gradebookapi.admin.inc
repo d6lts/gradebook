@@ -46,11 +46,11 @@ function gradebookapi_admin_settings() {
     '#suffix' => '</div><div class="clear-block"></div>',
   );
 
-  $usedateapi = module_exists('date_api');
+  $usedateapi = module_exists('date_popup');
   $form['gradebookapi_use_dateapi'] = array(
     '#type' => 'checkbox',
     '#title' => t('Use Date Popup for date selection'),
-    '#description' => $usedateapi ? t('Date API is enabled, check the box if you would like to use Date Popup for date selection.') : t('Date API is not available. Install and enable Date API for this feature.'),
+    '#description' => $usedateapi ? t('The <em>Date Popup</em> module is enabled, check the box if you would like to use a Date Popup for date selection.') : t('The <em>Date Popup</em> module is not available. Install and enable it to access this feature.'),
     '#default_value' => $usedateapi ? variable_get('gradebookapi_use_dateapi', FALSE) : FALSE,
     '#disabled' => !$usedateapi,
   ); 

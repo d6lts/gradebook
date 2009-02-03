@@ -1262,5 +1262,5 @@ function theme_gradebookapi_assignment_due_date($due_date) {
 }
 
 function _gradebookapi_usedateapi() {
-  return (module_exists('date_api') && variable_get('gradebookapi_use_dateapi', FALSE));
+  return (module_exists('date_popup') && variable_get('gradebookapi_use_dateapi', FALSE));
 }
