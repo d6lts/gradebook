@@ -103,9 +103,9 @@ function gradebook_grade_form($form_state, $gradebook, $grades) {
     $form['grade'][$id]['possible'] = array('#value' => $node->possible);
 
     if ($teacher) {  // display edit form
-      $form['grade'][$id]['earned'] = array('#type' => 'textfield', '#size' => 2, '#default_value' => $grade['earned']);
+      $form['grade'][$id]['earned'] = array('#type' => 'textfield', '#size' => 5, '#default_value' => $grade['earned']);
       $form['grade'][$id]['exempt'] = array('#type' => 'checkbox', '#default_value' => $grade['exempt']);
-      $form['grade'][$id]['note'] = array('#type' => 'textarea', '#cols' => 25, '#rows' => 6, '#default_value' => $grade['note']);
+      $form['grade'][$id]['note'] = array('#type' => 'textarea', '#cols' => 40, '#rows' => 6, '#default_value' => $grade['note']);
     }
     else { // display grades without option for editing
       $form['grade'][$id]['earned'] = array('#value' => $grade['earned']);

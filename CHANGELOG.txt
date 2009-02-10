@@ -1,5 +1,10 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-02-10
+----------------------
+* by MGN: Fixed gradebook list page so only relevent gradebooks are shown to the user
+* by MGN: Fixed width of earned and note fields
+
 Gradebook 6.x.2.x-dev, 2009-02-02
 ----------------------
 * by MGN: Modified earned and possible fields in gradebookapi database tables to be of type float

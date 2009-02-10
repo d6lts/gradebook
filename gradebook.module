@@ -352,7 +352,11 @@ function gradebook_list_page() {
   $sql .= tablesort_sql($header, 'weight, ');
   $result = pager_query($sql, variable_get('gradebook_gradebooks_per_page', 25));
   while ($term = db_fetch_object($result)) {
+   //Filter the gradebook list to show only gradebooks for which the user is a student or teacher
+   $gradebook = gradebookapi_gradebook_load($term->tid);
+   if (gradebookapi_is_student_or_teacher($gradebook)) {
     $rows[] = array('name' => l($term->name, 'gradebook/'. $term->tid));
+   }
   }
 
   $output = theme('table', $header, $rows);
