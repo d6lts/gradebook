@@ -343,25 +343,32 @@ function gradebook_edit_or_summary($gradebook) {
  */
 function gradebook_list_page() {
   $vid = gradebookapi_get_vid();
-
-  $header = array(
-    array('data' => t('Name'), 'field' => 't.name', 'sort' => 'asc'),
-  );
-
+  $header = array(array('data' => t('Name'), 'field' => 't.name', 'sort' => 'asc'));
+  $rows = array();
   $sql  = 'SELECT DISTINCT t.tid, t.name FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = '. $vid;
   $sql .= tablesort_sql($header, 'weight, ');
   $result = pager_query($sql, variable_get('gradebook_gradebooks_per_page', 25));
+  $lastpath = '';
   while ($term = db_fetch_object($result)) {
-   //Filter the gradebook list to show only gradebooks for which the user is a student or teacher
-   $gradebook = gradebookapi_gradebook_load($term->tid);
-   if (gradebookapi_is_student_or_teacher($gradebook)) {
-    $rows[] = array('name' => l($term->name, 'gradebook/'. $term->tid));
-   }
+    //Filter the gradebook list to show only gradebooks for which the user is a student or teacher
+    $gradebook = gradebookapi_gradebook_load($term->tid);
+    if (gradebookapi_is_student_or_teacher($gradebook)) {
+      $rows[] = array('name' => l($term->name, $lastpath = 'gradebook/'. $term->tid));
+    }
   }
-
-  $output = theme('table', $header, $rows);
-  $output .= theme('pager');
-
+  switch (count($rows)) {
+    case 0:
+      $output = t('You are not yet affiliated with a gradebook.');
+      if (user_access('administer gradebook')) {
+        $output .= '<br />'. t('You can add new gradebooks at <a href="@gradebook">@gradebook</a>.', array('@gradebook' => url('admin/gradebook/gradebook')));
+      }
+      break;
+    case 1:
+      drupal_goto($lastpath);
+    default:
+      $output = theme('table', $header, $rows);
+      $output .= theme('pager');
+  }
   return $output;
 }
 
