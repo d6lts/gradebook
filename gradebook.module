@@ -9,7 +9,7 @@
  * Implementation of hook_perm().
  */
 function gradebook_perm() {
-  return array('admin gradebook', 'access gradebook', 'attach files to gradebook');
+  return array('administer gradebook', 'access gradebook', 'attach files to gradebook');
 }
 
 /**

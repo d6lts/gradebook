@@ -61,8 +61,8 @@ gradebook administrator can take over, if desired.
    and students who will be using the gradebook. This is done through the Drupal 
    administration menu (User Management >> Roles)
 
-   a. The Gradebook module provides 'admin gradebook', 'access gradebook', and 'attach files 
-      to gradebook'  permissions. The 'admin gradebook' permission is 
+   a. The Gradebook module provides 'administer gradebook', 'access gradebook', and 'attach files 
+      to gradebook'  permissions. The 'administer gradebook' permission is 
       necessary to allow a user to add, edit, and view gradebooks from the administration 
       page (admin/gradebook/gradebook). Its also needed for assigning gradebook students
       and teachers to the available Drupal roles, as well as for general gradebook settings.
@@ -73,7 +73,7 @@ gradebook administrator can take over, if desired.
       students, its more convenient to grant this permission from the Gradebook Settings page 
       at Administer >> Gradebook >> Gradebooks >> Settings  (admin/gradebook/gradebook/settings).
 
-   b. The Gradebook API modeule provides 'admin gradebook api' permissions. This permissions
+   b. The Gradebook API modeule provides 'admin gradebookapi' permissions. This permissions
       allows the user to configure the gradebook module, determining what content types are 
       treated as assignments.
 
@@ -82,7 +82,7 @@ gradebook administrator can take over, if desired.
 	  1. System module: 'access administration pages' 
 	  2. System module: 'administer site configuration'
 	  3. Node Module:   create assignment content types
-	  4. 'admin gradebook' 
+	  4. 'administer gradebook' 
       ii. Teachers:
 	  1. 'create ...' - at least the assignment types.
 	  2. 'access gradebook'

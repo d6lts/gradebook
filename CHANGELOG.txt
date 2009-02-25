@@ -1,5 +1,9 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-02-25
+----------------------
+#383664 by MGN: Fixed permission typo: 'admin gradebook' is now 'administer gradebook'.
+
 Gradebook 6.x.2.x-dev, 2009-02-24
 ----------------------
 #382254 by MGN: Fixed two file support bugs reported by bdangelo and madflute.
