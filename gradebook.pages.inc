@@ -237,6 +237,7 @@ function gradebook_grade_form_validate($form, &$form_state) {
 }
 
 function gradebook_grade_form_cancel($form, &$form_state) {
+    unset($form_state['storage']);  // clear the storage bins - needed for redirect
     $form_state['redirect'] = $form_state['values']['return_url'];
     unset($form_state['values']['return_url']);
 }
@@ -253,7 +254,12 @@ function gradebook_grade_form_submit($form, &$form_state) {
         gradebookapi_set_grade($grade);
       }
       else {
-        gradebookapi_manage_attachments($grade); // must have permissions to upload files to get this far...
+        if ($grade->timestamp == 0) {  // grade doesn't exist in gradebookapi_grade, save a null grade 
+          gradebookapi_set_grade($grade);
+        }
+        else { // grade already exists, just save the attachments
+          gradebookapi_manage_attachments($grade); // must have permissions to upload files to get this far...
+        }
       }
       ++$count;
     }

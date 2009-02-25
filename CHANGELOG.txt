@@ -1,5 +1,11 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-02-24
+----------------------
+#382254 by MGN: Fixed two file support bugs reported by bdangelo and madflute.
+* by MGN: database modification: changed {gradebookapi_files} primary key to ('fid', 'nid'), 
+  and make fid field NOT NULL (since its a primary key).
+
 Gradebook 6.x.2.x-dev, 2009-02-10
 ----------------------
 * by MGN: Modified gradebook_list_page to show table only when there are two or more gradebooks. For

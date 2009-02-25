@@ -317,7 +317,7 @@ function gradebookapi_get_grade($uid, $nid) {
     $grade = db_fetch_object($result);
     $grade->uid = $uid;
     $grade->nid = $nid;
-
+    $grade->timestamp = 0; // use this to indicate that grade was not loaded from database
     return $grade;
   }
 }

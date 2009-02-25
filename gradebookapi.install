@@ -61,7 +61,7 @@ function gradebookapi_schema() {
     'fields' => array(
       'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
-      'fid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE),
+      'fid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'list'        => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny',
                              'description' => t('Whether the file should be visibly listed on the grade note.'), ),
       'description' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
@@ -71,7 +71,7 @@ function gradebookapi_schema() {
       'uid' => array('uid'),
       'fid' => array('fid'),
     ),
-    'primary key' => array('fid'),
+    'primary key' => array('fid', 'nid'),
   );
 
   return $schema;
@@ -164,5 +164,14 @@ function gradebookapi_update_6003() {
   db_change_field($ret, 'gradebookapi_cache', 'earned', 'earned', array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE));  
   db_change_field($ret, 'gradebookapi_cache', 'possible', 'possible', array('type' => 'float', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0));
 
+  return $ret;
+}
+
+function gradebookapi_update_6004() {
+  // fix mistakes made on gradebookapi_files fields and keys
+  $ret = array();
+  db_change_field($ret, 'gradebookapi_files', 'fid', 'fid', array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0));
+  db_drop_primary_key($ret, 'gradebookapi_files');
+  db_add_primary_key($ret, 'gradebookapi_files', array('fid', 'nid'));
   return $ret;
 }
