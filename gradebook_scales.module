@@ -1,0 +1,602 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Provides weights and scales for Gradebooks
+ */
+
+/**
+ * Implementation of hook_theme().
+ */
+function gradebook_scales_theme() {
+  return array(
+    'gradebook_scales_form' => array('arguments' => array('form_state', 'gid', 'scalename', 'scalevalues')),
+    'gradebook_scales_weight_form' => array('arguments' => array('form' => NULL )),
+  );
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function gradebook_scales_menu() {
+  $items = array();
+  $items['gradebook/%gradebookapi_gradebook/scales'] = array(
+    'title'            => 'List scales',
+    'page callback'    => 'gradebook_scales_list_page',
+    'page arguments'   => array(1),
+    'access callback'  => 'gradebookapi_is_teacher',
+    'access arguments' => array(1),
+    'weight'           => 5,
+    'type'             => MENU_LOCAL_TASK,
+  );
+
+  $items['gradebook/%gradebookapi_gradebook/scaleadd'] = array(
+    'title'            => 'Add scale',
+    'page callback'    => 'gradebook_scales_add_page',
+    'page arguments'   => array(1),
+    'access callback'  => 'gradebookapi_is_teacher',
+    'access arguments' => array(1),
+    'weight'           => 6,
+    'type'             => MENU_LOCAL_TASK,
+  );
+
+  $items['gradebook/%gradebookapi_gradebook/scaleedit/%'] = array(
+    'title'            => 'Edit scale',
+    'page callback'    => 'gradebook_scales_edit_page',
+    'page arguments'   => array(1, 3),
+    'access callback'  => 'gradebookapi_is_teacher',
+    'access arguments' => array(1),
+    'weight'           => 5,
+    'type'             => MENU_CALLBACK,
+  );
+
+  $items['gradebook/%gradebookapi_gradebook/catweights'] = array(
+    'title'              => 'Weight categories',
+    'page callback'      => 'drupal_get_form',
+    'page arguments'     => array('gradebook_scales_weight_form', 1),
+    'access callback'    => 'gradebookapi_is_teacher',
+    'access arguments'   => array(1),
+    'type'               => MENU_LOCAL_TASK,
+    'weight'             => 4,
+  );
+
+  return $items;
+
+}
+
+function gradebook_scales_list_page($gradebook) {
+    // get all available scales for this gradebook
+    $scales = gradebook_scales_get_scales($gradebook->tid);
+
+    $start_from      = isset($_GET['page']) ? $_GET['page'] : 0;
+    $total_entries   = 0;  // total count for pager
+    $page_increment  = 25; // number of tids per page
+    $displayed_count = 0;  // number of tids shown
+
+    $rows = array();
+
+    foreach ($scales as $scale) {
+      $total_entries++; // we're counting all-totals, not displayed
+      if (($start_from && ($start_from * $page_increment) >= $total_entries) || ($displayed_count == $page_increment)) {
+        continue;
+      }
+      $rows[] = array($scale->scalename, l('edit', 'gradebook/'. $gradebook->tid .'/scaleedit/'. $scale->sid));
+      $displayed_count++; // we're counting tids displayed
+    }
+
+    if (empty($rows)) {
+      $rows[] = array(array('data' => t('No scales available.'), 'colspan' => '2'));
+    }
+
+    $GLOBALS['pager_page_array'][] = $start_from;  // FIXME
+    $GLOBALS['pager_total'][] = intval($total_entries / $page_increment) + 1; // FIXME
+
+    if ($total_entries >= $page_increment) {
+      $rows[] = array(array('data' => theme('pager', NULL, $page_increment), 'colspan' => '2'));
+    }
+    $header = array(t('Scale Name'), t('Operations'));
+
+    return theme('table', $header, $rows);
+}
+
+function gradebook_scales_add_page($gradebook) {
+  return gradebook_scales_edit_page($gradebook);
+}
+
+function gradebook_scales_edit_page($gradebook, $sid = NULL) {
+  $scalename = '';
+  if (!is_null($sid)) {   // create the $scalevalues array if $sid is not NULL
+    $scalename = gradebook_scales_get_scalename($sid);
+    if ((isset($_POST['op']) && $_POST['op'] == t('Delete')) || isset($_POST['confirm'])) {
+      return drupal_get_form('gradebook_scales_confirm_scale_delete', $gradebook->tid, $sid, $scalename);
+    }
+    $scalevalues = gradebook_scales_get_scale_data($sid);
+  }
+  return drupal_get_form('gradebook_scales_form', $gradebook->tid, $sid, $scalename, $scalevalues);
+
+}
+
+function gradebook_scales_form(&$form_state, $gid, $sid = NULL, $scalename = '', $scalevalues = array()) {
+  $form = array('#theme' => 'gradebook_scales_form');
+  $form['#gid'] = $gid;
+  if (!is_null($sid)) {
+    $form['#sid'] = $sid;
+  }
+  $form['scalename'] = array('#type' => 'textfield', '#title' => t('Scale Name'), '#size' => 32, '#default_value' => $scalename, '#required' => TRUE);
+  $form['entry'] = array('#tree' => TRUE);
+  $imax = count($scalevalues) + 6;  //add some more fields for good measure
+  for ($i=0; $i<$imax; $i++) {
+    $form['entry'][$i]['min']  = array('#type' => 'textfield', '#size' => 5, '#default_value' => $scalevalues[$i]['min']);
+    $form['entry'][$i]['max']  = array('#type' => 'textfield', '#size' => 5, '#default_value' => $scalevalues[$i]['max']);
+    $form['entry'][$i]['mark'] = array('#type' => 'textfield', '#size' => 5, '#default_value' => $scalevalues[$i]['mark']);
+  }
+  $vid = gradebookapi_get_vid();
+  $result = db_query('SELECT DISTINCT t.tid, t.name FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = %d', $vid);
+  $options = array();
+  while ($term = db_fetch_object($result)) {
+    $gradebook = gradebookapi_gradebook_load($term->tid);
+    if (gradebookapi_is_teacher($gradebook)) {
+      $options[$term->tid] = $term->name;
+    }
+    unset($options[$gid]);
+  }
+  if (!empty($options)) {
+    $form['copygid'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Make a copy of this scale for my other gradebooks'),
+      '#options' => $options,
+      '#required' => FALSE,
+    );
+  }
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Save'));
+  if (isset($form['#sid'])) {
+    $form['delete'] = array('#type' => 'submit', '#value' => t('Delete'));
+  }
+  $form['cancel'] = array('#type' => 'submit', '#value' => t('Cancel'), '#submit' => array('gradebook_scales_form_cancel'));
+
+  return $form;
+}
+
+function gradebook_scales_form_cancel($form, &$form_state) {
+  $form_state['redirect'] = array('gradebook/'. $form['#gid']);
+}
+
+function gradebook_scales_form_submit($form, &$form_state) {
+// insert or update scale name
+// note: it should also be possible to share scales between gradebooks that have a common teacher
+
+  $sid = isset($form['#sid']) ? $form['#sid'] : NULL;
+  gradebook_scales_save_scale($form['#gid'], $sid, $form_state['values']['scalename'], $form_state['values']['entry']);
+  $copygids = array_filter((array)$form_state['values']['copygid']);
+  foreach ($copygids as $gid) {
+    gradebook_scales_save_scale($gid, NULL, $form_state['values']['scalename'], $form_state['values']['entry']);
+  }
+  $form_state['redirect'] = array('gradebook/'. $form['#gid']);
+}
+
+/**
+ * Form builder for the scale  delete form.
+ *
+ * @ingroup forms
+ */
+
+function gradebook_scales_confirm_scale_delete(&$form_state, $gid, $sid, $scalename) {
+  $form = array();
+  $form['#sid'] = $sid;
+  $form['#gid'] = $gid;
+  return confirm_form(
+    $form,
+    t('Are you sure you want to delete the gradebook scale %name?', array('%name' => $scalename)),
+    'gradebook/'. $gid .'/scales',
+    t('This action cannot be undone.'),
+    t('Delete'),
+    t('Cancel')
+  );
+}
+
+function gradebook_scales_confirm_scale_delete_submit($form, &$form_state) {
+  gradebook_scales_scale_delete($form['#sid']);
+  drupal_set_message(t('The gradebook scale has been deleted.'));
+  watchdog('gradebook_scales', 'gradebook_scales: deleted scale %sid.', array('%sid' => $form['#sid']), WATCHDOG_NOTICE);
+  $form_state['redirect'] ='gradebook/'. $form['#gid'] .'/scales';
+  return;
+}
+
+function theme_gradebook_scales_form(&$form) {
+  $output = '<p>'. t('Provide a brief, informative name for the scale. This will appear on the assignment edit form to choose a scale') .'</p>';
+  $output .= drupal_render($form['scalename']);
+  $output .= '<p>'. t('<strong>Instructions:</strong> Enter grading scales with one mark in each row. The scale maps a range of grade percentages to a mark, which can be a sequence of up to 5 characters.') .'</p>';
+  $output .= '<p>'. t('Example: A grade of 90 (Min) to 100 (Max) might be displayed as an <em>A</em>.') .'</p>';
+  $output .= '<p><em>'. t('If more rows are needed, fill available rows, save the form and then edit again. This will add additional blank rows to the form. All fields must be entered for a row to be saved.') .'</em></p>';
+  $header = array('min' => t("Minimum %"), 'max' => t("Maximum %"), 'mark' => t('Mark'));
+  $rownums = element_children($form['entry']);
+  foreach ($rownums as $id) {
+    $row = NULL;
+    $row[] = array('data' => drupal_render($form['entry'][$id]['min']), 'class' => '');
+    $row[] = array('data' => drupal_render($form['entry'][$id]['max']), 'class' => '');
+    $row[] = array('data' => drupal_render($form['entry'][$id]['mark']), 'class' => '');
+    $rows[] = array('data' => $row);
+  }
+  $output .= theme('table', $header, $rows, array('class' => ''));
+  $output .= drupal_render($form['copygid']);
+  $output .= '<div class="container-inline">'. drupal_render($form['submit']);
+  $output .= drupal_render($form['cancel']) . drupal_render($form['delete']) .'</div>';
+  $output .= drupal_render($form);
+  return $output;
+}
+
+function gradebook_scales_get_scales($gid = NULL) {
+  $scales = array();
+  if (!is_null($gid)) {
+    $result = db_query('SELECT * FROM {gradebook_scales} WHERE gid = %d', $gid);
+  }
+  else {  // show all possible scales if no gradebook is selected
+    $result = db_query('SELECT * FROM {gradebook_scales}');
+  }
+  while ($scale = db_fetch_object($result)) {
+    $scales[$scale->sid] = $scale;
+  }
+  return $scales;
+}
+
+function gradebook_scales_get_scale_data($sid) {
+  $scalevalues = array();
+  $result = db_query('SELECT * FROM {gradebook_scales_data} WHERE sid = %d ORDER BY min DESC', $sid);
+  while ($row = db_fetch_array($result)) {
+    $scalevalues[] = $row;
+  }
+  return $scalevalues;
+}
+
+function gradebook_scales_get_scalename($sid) {
+  return db_result(db_query('SELECT scalename FROM {gradebook_scales} where sid = %d', $sid));
+}
+
+function gradebook_scales_save_scale($gid, $sid = NULL, $scalename, $rows) {
+  if (is_null($sid) || $sid == 0) { // create a new scale : better to all $sid == 0 and enforce NULL for no scale
+    db_query("INSERT INTO {gradebook_scales} (gid, scalename) VALUES (%d, '%s')", $gid, $scalename);
+    $sid = db_last_insert_id('gradebook_scales', 'sid');
+  }
+  else { // update an existing scale
+    db_query("UPDATE {gradebook_scales} SET scalename = '%s' WHERE sid = %d", $scalename, $sid);
+  }
+  db_query("DELETE FROM {gradebook_scales_data} WHERE sid = %d", $sid);  // remove previous scale values, if any
+  foreach ($rows as $row) {
+    if (is_numeric($row['min']) && is_numeric($row['max'])) {
+      db_query("INSERT INTO {gradebook_scales_data} (sid, min, max, mark) VALUES (%d, %f, %f, '%s')", $sid, $row['min'], $row['max'], $row['mark']);
+    }
+  }
+}
+
+function gradebook_scales_scale_delete($sid) {
+  db_query("UPDATE {gradebookapi_assignment} SET sid = %s WHERE sid = %d", 'NULL', $sid);
+  db_query('DELETE FROM {gradebook_scales_data} WHERE sid = %d', $sid);
+  db_query('DELETE FROM {gradebook_scales} WHERE sid = %d', $sid);
+}
+
+
+/**
+ *  gradebookapi_assigment_form_elements().
+ *    Prepare extra assignment fields for the node create forms.
+ *    Called via hook_form_alter.
+ *  @param $node
+ *    the assignment node
+ *  @return $form
+ *    additional form array elements for the assignment create form.
+ */
+
+function gradebook_scales_assignment_form_elements($node) {
+  $form = array();
+  $oldsid = $node->sid;
+  $oldtax = $node->taxonomy;
+  $gradebook = NULL;
+  if (is_array($oldtax)) {  // an array of terms
+    $vid = gradebookapi_get_vid();
+    foreach ($oldtax as $term) {
+      if ($term->vid == $vid) {  // find the gradebook term
+        $gradebook = gradebookapi_get_tid_gradebook($term->tid);
+      }
+    }
+  }
+  $gid = isset($gradebook) ? $gradebook->tid : NULL;
+  $scales = gradebook_scales_get_scales($gid);
+  foreach ($scales as $scale) {
+    if ($gid) { 
+      $text = $scale->scalename;      
+    }
+    else {
+      $term = taxonomy_get_term($scale->gid);
+      $text = $term->name .'::'. $scale->scalename;
+    }
+    $options[$scale->sid] = $text;
+  }
+  $options['none'] = t('No Scale');
+
+  $form['gradebook_scale'] = array(
+    '#title' => t('Assignment Grading Scale'),
+    '#type' => 'fieldset',
+    '#tree' => FALSE,
+    '#weight' => 0,
+    '#validate' => array('gradebook_scales_assignment_validate' => array()),
+  );
+
+  $form['gradebook_scale']['sid'] = array(
+    '#type' => 'select',
+    '#title' => t('Select Scale'),
+    '#options' => $options,
+    '#default_value' => isset($node->sid) ? $node->sid : 'none',
+    '#required' => TRUE,
+  );
+  
+  $form['#submit'][] = 'gradebook_scales_assignment_submit';
+  if (isset($oldsid)) {
+    $form['gradebook_scale']['oldsid'] = array('#type' => 'hidden', '#value' => $oldsid);
+  }
+
+  return $form;
+}
+
+/**
+ *  Implementation of hook_validate().
+ *    Verify the form elements have acceptable values.
+ *  @param $node
+ *    the assignment node
+ *  @param $form
+ *    the $form parameter passed from node_validate
+ *  @return NONE
+ */
+function gradebook_scales_assignment_validate($node, $form = NULL) {
+  if ($node) {
+    $vid = gradebookapi_get_vid();
+    $tid = $node->taxonomy[$vid];
+    $tid = is_array($tid) ? array_pop($tid) : $tid;
+    $gradebook = gradebookapi_get_tid_gradebook($tid);
+    $allowed = gradebook_scales_get_scales($gradebook->tid);
+    if (!isset($allowed[$node->sid]) && $node->sid != 'none') {
+      form_set_error('sid', t('The selected scale is not available for the selected gradebook(s).'));
+    } 
+    else {
+      // refresh the scales for this assignment since assignment may have changed
+      gradebookapi_load_marks($gradebook->tid, $node->nid, 0, TRUE);
+    }
+  }
+}
+
+/**
+ * Implementation of hook_form_alter().
+ *
+ * @return NONE
+ */
+function gradebook_scales_form_alter(&$form, $form_state, $form_id) {
+  if (isset($form['type']) && $form['type']['#value'] .'_node_form' == $form_id) {
+    $node = $form['#node'];
+    $types = gradebookapi_get_assignment_types();
+    if (!empty($types)) { // are we an assignment type?
+      if (in_array($node->type, $types)) {
+        $form = array_merge($form, gradebook_scales_assignment_form_elements($node));
+      } 
+    }
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ *
+ * @return NONE
+ */
+function gradebook_scales_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+  if (in_array($node->type, (array)gradebookapi_get_assignment_types())) {
+    switch ($op) {
+      case 'load':
+        return db_fetch_array(db_query('SELECT sid FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid));
+      case 'insert':
+      case 'update':
+        $sid = ($node->sid == 'none' || $node->sid === NULL) ? 'NULL' : (int)$node->sid;
+        if (db_result(db_query('SELECT * FROM {gradebookapi_assignment} a WHERE a.nid = %d', $node->nid))) {
+          db_query("UPDATE {gradebookapi_assignment} SET sid = %s  WHERE nid = %d", $sid, $node->nid); 
+        }
+        else { // assignment doesn't exist in gradebookapi_assignment table, so insert it
+          db_query("INSERT INTO {gradebookapi_assignment} (nid, sid) VALUES (%d, %s)", $node->nid, $sid);
+        }
+        break;
+      case 'delete':
+        db_query('DELETE FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid);
+        break;
+      case 'view':
+        break;
+      case 'validate':
+        gradebook_scales_assignment_validate($node, $a3);
+        break;
+    }
+  }
+}
+
+/**
+ *  Implementation of hook_gradebookapi_marks().
+ *  Load the assignment scale matrix for the gradebook
+ */
+function gradebook_scales_gradebookapi_marks($gid, $aid = -1, $gradepoints, $refresh = FALSE) {
+// each assignment has a mark, and there are many assignments in a gradebook
+// for efficiency, store the marks for each gradebook statically, as they are
+// requested. Then subsequent views can be quickly looked up.
+// If an assignment is modified (changing scale) then this cache will need to
+// be refreshed.  
+// $data[$gid][$aid]['has_scale'] = TRUE means there is a loaded scale
+// $data[$gid][$aid]['has_scale'] = FALSE means use the default numerical values (no scale)
+// emtpy($data[$gid][$aid]) means we haven't checked yet.
+  
+  static $data, $scales;
+  if ($refresh) { // reload scale data for $gid and $aid
+    if ($aid == -1) { // reset all
+      unset($data[$gid]);
+      $data[$gid] = array();
+    }
+    else { // refresh just this assignment
+      unset($data[$gid][$aid]);
+    }
+  }  
+  else {
+    if (!is_array($data[$gid])){
+      $data[$gid] = array();
+    }
+    if (!is_array($data[$gid][$aid])){
+      $data[$gid][$aid] = array();
+    }
+    if (empty($data[$gid][$aid])) { //retrieve scale data for this assignment 
+      $sid = db_result(db_query('SELECT sid from {gradebookapi_assignment} WHERE nid = %d', $aid));
+      if (is_null($sid) || $sid == 0) {
+        $data[$gid][$aid] = array( 'has_scale' => FALSE);
+        return FALSE;
+      } 
+      else {  // a scale exists, continue with the operation
+        $data[$gid][$aid] = array('has_scale' => TRUE, 'sid' => $sid);
+        if (!is_array($scales[$sid])) { // we need to retrieve the scale from the database
+          $scales[$sid] = gradebook_scales_get_scale_data($sid);
+        }
+      }
+    }
+    // mark data is available, perform operation
+    if ($data[$gid][$aid]['has_scale'] == FALSE) {
+      return FALSE;
+    }
+    $sid = $data[$gid][$aid]['sid'];
+    foreach ((array)$scales[$sid] as $scale) {
+      if ($gradepoints >= $scale['min'] && $gradepoints <= $scale['max']) {
+        return $scale['mark'];
+      }
+    }
+    return FALSE;  // no mark exists
+  }
+}
+
+function gradebook_scales_gradebookapi_get_gradebook_weights($gid) {
+  $method =  gradebook_scales_gradebook_weight_method($gid);
+  $weights = array('category' => array());
+  $result = db_query('SELECT tid, gradeweight FROM {gradebook_scales_grade_weight} WHERE gid = %d',$gid);
+  while ($weightdata = db_fetch_object($result)) {
+    $weights['category'][$weightdata->tid] = $weightdata->gradeweight;
+  }
+  return array_merge( array('method' => $method), $weights);
+}
+
+function gradebook_scales_save_gradebook_weights($gid, $edit) {
+  $rows = db_result(db_query('SELECT COUNT(gid)FROM {gradebook_scales_calc_method} WHERE gid = %d', $gid));
+  if ($rows > 0) {
+    db_query('UPDATE {gradebook_scales_calc_method} SET calcmethod = %d WHERE gid = %d', $edit['method'], $gid);
+  }
+  else {
+    db_query('INSERT INTO {gradebook_scales_calc_method} (gid, calcmethod) VALUES (%d, %d)',$gid, $edit['method']);
+  } 
+  db_query('DELETE FROM {gradebook_scales_grade_weight} WHERE gid = %d', $gid); //clear old weights
+
+  if (!empty($edit['category'])) {
+    $keys = array_keys($edit['category']);
+    foreach($keys as $key) {
+      $value = is_numeric($edit['category'][$key]) ? abs((float)$edit['category'][$key]) : 'NULL';
+      db_query('INSERT INTO {gradebook_scales_grade_weight} (gid, tid, gradeweight) VALUES (%d, %d, %s)', $gid, $key, $value);
+    }
+  }
+  gradebookapi_rebuild_grades($gid);  // re-calculate all term grades since weighting may have changed
+}
+
+function gradebook_scales_gradebook_weight_method($gid) {
+  return db_result(db_query('SELECT calcmethod FROM {gradebook_scales_calc_method} WHERE gid = %d', $gid));
+}
+
+function gradebook_scales_weight_form($form_state, $gradebook) {
+  $default = gradebook_scales_gradebookapi_get_gradebook_weights($gradebook->tid);
+  $vid = gradebookapi_get_vid();
+  $vocabulary = taxonomy_vocabulary_load($vid);
+  $tree = taxonomy_get_tree($vocabulary->vid, $gradebook->tid);
+  $form = array();
+  $form = array('#theme' => 'gradebook_scales_weight_form');
+  $form['method'] = array(
+    '#title' => t('Weight Gradebook Categories'),
+    '#type' => 'radios',
+    '#options' => array(0 => t('No Weighting'),
+                        1 => t('Weight final grade by category percentages'),
+                        2 => t('Weight final grade by category multiplier'), ),
+    '#default_value' => $default['method'],
+    '#description' => t('Select the method to use to weight graded assignments to determine overall grade. Weighting by category percentages assigns a percentage of the total grade to each category. Weighting by category multiplier will determine the overall grade points after multiplying earned and possible grades by category weight.  For ether weighting method, enter category weights as percentages, below.'),
+    '#required' => TRUE
+  );
+
+  $form['category'] = array('#tree' => TRUE);
+  foreach ($tree as $term) {
+    $id = $term->tid;
+    if (!isset($default['category'][$id])) {
+      $default['category'][$id] = '';
+    }
+    $form['category'][$id] = array('#type' => 'textfield', '#size' => 4, '#default_value' => $default['category'][$id]);
+  }
+
+  $form['#gid'] = $gradebook->tid;
+  $form['submit' ] = array('#type' => 'submit', '#value' => t('Save'));
+  $form['cancel'] = array('#type' => 'submit', '#value' =>  t('Cancel'), '#submit' => array('gradebook_scales_weight_form_cancel'));
+  return $form;
+}
+
+function gradebook_scales_weight_form_submit($form, &$form_state) {
+  gradebook_scales_save_gradebook_weights($form['#gid'], $form_state['values']);
+  $form_state['redirect'] = 'gradebook/'. $form['#gid'] .'/catlist';
+}
+
+function gradebook_scales_weight_form_cancel($form, &$form_state) {
+  $form_state['redirect'] = 'gradebook/'. $form['#gid'] .'/catlist';
+}
+
+function theme_gradebook_scales_weight_form(&$form) {
+  $output = drupal_render($form['method']);
+  $header = array(t('Category name'), t('Weight (%)'));
+  $keys = element_children($form['category']);
+  foreach ($keys as $key) {
+    $term = taxonomy_get_term($key);
+    $row = NULL;
+    $row[] = array('data' => $term->name);
+    $row[] = array('data' => drupal_render($form['category'][$key]));
+    $rows[] = array('data' => $row);
+  }
+  $output .= theme('table', $header, $rows);
+  $output .= '<div>'. drupal_render($form['submit']) . drupal_render($form['cancel']) .'</div>';
+  $output .= drupal_render($form);
+  return $output;
+}
+
+/**
+ * Implementation of hook_gradebookapi_weighted_grade().
+ *
+ */
+function gradebook_scales_gradebookapi_weighted_grade($gid, $tid, $possible, $earned) {
+  $weighted_grade = array('earned' => $earned, 'possible' => $possible);
+  $weights = gradebook_scales_gradebookapi_get_gradebook_weights($gid);
+  if ($weights['method'] > 0) {
+    if (is_numeric($weights['category'][$tid])) {  // if category weight isn't set, treat as 0% weight
+      switch ($weights['method']) {
+        case 1:  // term grade is a category weighted percentage
+          $weighted_grade['earned'] = ($possible == 0) ? 0 : $weights['category'][$tid]*$earned/$possible; 
+          $weighted_grade['possible'] = ($possible == 0) ? 0 : $weights['category'][$tid];
+          break;
+        case 2: // term grade is a weighted point total
+          $weighted_grade['earned'] = $weights['category'][$tid]*$earned/100.0;
+          $weighted_grade['possible'] = $weights['category'][$tid]*$possible/100.0;
+          break;
+      }
+    }
+  }
+  return $weighted_grade;
+}
+
+/**
+ * Implementation of hook_disable().
+ *   set weighting method to unweighted and rebuild grades before module is disabled
+ *
+ */
+function gradebook_scales_disable() {
+  $vid = gradebookapi_get_vid();
+  $result = db_query('SELECT DISTINCT t.tid FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = %d', $vid);
+  while ($tid = db_result($result)) { // turn off weighting for all gradebooks and rebuild grades
+    db_query('UPDATE {gradebook_scales_calc_method} SET calcmethod = %d WHERE gid = %d', 0, $tid);
+    gradebookapi_rebuild_grades($tid);  // re-calculate all term grades since weighting may have changed
+  }
+}

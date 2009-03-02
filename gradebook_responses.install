@@ -1,0 +1,51 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * gradebook_responses.install: Install schema for gradebook_responses
+ */
+
+/**
+ * Implementation of hook_schema().
+ */
+
+function gradebook_responses_schema() {
+
+  $schema['gradebook_responses'] = array(
+    'fields' => array(
+      'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'aid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'rstatus'     => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny'),
+    ),
+    'indexes' => array(
+      'aid' => array('aid'),
+      'uid' => array('uid'),
+      'rstatus' => array('rstatus'),
+    ),
+    'primary key' => array('nid'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implementation of hook_install().
+ */
+
+function gradebook_responses_install() {
+  // Create tables.
+  drupal_install_schema('gradebook_responses');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function gradebook_responses_uninstall() {
+
+  // Remove tables.
+
+  drupal_uninstall_schema('gradebook_responses');
+}
+

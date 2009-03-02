@@ -57,22 +57,8 @@ function gradebookapi_schema() {
     'primary key' => array('tid', 'uid'),
   );
 
-  $schema['gradebookapi_files'] = array(
-    'fields' => array(
-      'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
-      'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
-      'fid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
-      'list'        => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny',
-                             'description' => t('Whether the file should be visibly listed on the grade note.'), ),
-      'description' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
-    ),
-    'indexes' => array(
-      'nid' => array('nid'),
-      'uid' => array('uid'),
-      'fid' => array('fid'),
-    ),
-    'primary key' => array('fid', 'nid'),
-  );
+  // Moved {gradebookapi_files} table to $schema['gradebook_attachments']
+  // couldn't find a way to handle this transfer gracefully
 
   return $schema;
 }
@@ -161,7 +147,7 @@ function gradebookapi_update_6003() {
   // switch earned and possible fields to type float to allow fractional point assignments (was formerly int)
   db_change_field($ret, 'gradebookapi_grade', 'earned', 'earned', array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE));
   db_change_field($ret, 'gradebookapi_assignment', 'possible', 'possible', array('type' => 'float', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0));
-  db_change_field($ret, 'gradebookapi_cache', 'earned', 'earned', array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE));  
+  db_change_field($ret, 'gradebookapi_cache', 'earned', 'earned', array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE));
   db_change_field($ret, 'gradebookapi_cache', 'possible', 'possible', array('type' => 'float', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0));
 
   return $ret;
@@ -175,3 +161,5 @@ function gradebookapi_update_6004() {
   db_add_primary_key($ret, 'gradebookapi_files', array('fid', 'nid'));
   return $ret;
 }
+
+

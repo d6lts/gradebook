@@ -1,0 +1,376 @@
+<?php
+// $Id$
+/**
+ * @file
+ * Provides student responses to gradebook assignments.
+ */
+
+/**
+ * Implementation of hook_theme().
+ */
+function gradebook_responses_theme() {
+  return array(
+    'gradebook_responses_assignment' => array('arguments' => array('aid')),
+    'gradebook_responses_status' => array('arguments' => array('rstatus')),
+  );
+}
+
+function gradebook_responses_user($op, &$edit, &$account, $category = NULL) {
+  if ($op == 'delete' ) {
+    // do something with gradebook responses...parallel what is done in gradebookapi
+  }
+}
+/**
+ *  gradebook_responses_get_response_types
+ *  @return 
+ *    an array of content types that are used as student responses 
+ */
+function gradebook_responses_get_response_types() {
+  $types = array_filter((array)variable_get('gradebook_responses_types', array())); //set on gradebookapi admin form
+  return $types;
+}
+
+/**
+ *  gradebook_responses_get_responses
+ *    Retrieve student response node information from gradebook_responses database table
+ *  @param $param 
+ *    an array of the form array($key => $value, ...), where $key can be 'uid', 'nid', or 'aid' 
+ *    example to return all responses for assignment with $node->nid use array('aid' => $node->nid) 
+ *  @return
+ *    an array of the response values as an array
+ */
+function gradebook_responses_get_responses($param = array()) {
+  foreach ($param as $key => $value) {
+    $cond[] = db_escape_string($key) .' = %d';
+    $arguments[] = $value;
+  }
+  $cond = implode(' AND ', $cond);
+
+  $result = db_query('SELECT * FROM {gradebook_responses} WHERE '. $cond, $arguments);
+  $responses= array();
+  while ($response = db_fetch_array($result)) {
+   $responses[] = $response;
+  }
+  return $responses;
+}
+
+function gradebook_responses_grade_has_response($nid, $uid) {
+  $count = db_result(db_query('SELECT COUNT(nid) FROM {gradebook_responses} WHERE uid=%d and aid=%d', $uid, $nid));
+  return ($count > 0);
+}
+
+/**
+ *  gradebook_responses_load().
+ *    Retrieve the additional form fields from the gradebook_responses database table.
+ *    These fields will be added to response create node form.
+ *    Called via hook_nodeapi (load).
+ *  @param $node
+ *    the response node
+ *  @return
+ *    an array of form default values
+ */
+function gradebook_responses_load($node) {
+  $additions = gradebook_responses_get_responses(array('nid' => $node->nid));
+  return array_pop($additions);
+}
+
+/**
+ *  gradebook_responses_insert().
+ *    Insert additional assignment fields into the gradebook_responses database table.
+ *    Called via hook_nodeapi (insert).
+ *  @param $node
+ *    the assignment node
+ *  @return NONE
+ */
+function gradebook_responses_insert($node) {
+  db_query("INSERT INTO {gradebook_responses} (nid, aid, uid, rstatus) VALUES (%d, %d, %d, %d)", $node->nid, $node->aid, $node->uid, $node->rstatus);
+}
+
+/**
+ *  gradebook_responses_update().
+ *    Update additional response fields in the gradebook_responses database table when the node is updated.
+ *    Called via hook_nodeapi (update).
+ *  @param $node
+ *    the assignment node
+ *  @return NONE
+ */
+function gradebook_responses_update(&$node) {
+
+  if (db_result(db_query('SELECT * FROM {gradebook_responses} a WHERE a.nid = %d AND a.uid=%d', $node->nid, $node->uid))) {
+    db_query("UPDATE {gradebook_responses} SET aid = %d, rstatus = %d WHERE nid = %d AND uid =%d", $node->aid, $node->rstatus, $node->nid, $node->uid); 
+  }
+  else { // assignment doesn't exist in gradebook_responses table for this user, so insert it
+    gradebook_responses_insert($node);
+  }
+}
+
+/**
+ *  gradebook_responses_delete().
+ *    Delete response field values from the gradebook_responses database table when the node is deleted.
+ *    The grades are then recalculated.
+ *    Called via hook_nodeapi (delete).
+ *  @param $node
+ *    the assignment node
+ *  @return
+ *    NONE
+ */
+function gradebook_responses_delete($node) {
+  // delete records for all students for this assignment node
+  db_query('DELETE FROM {gradebook_responses} WHERE nid = %d AND uid = %d', $node->nid, $node->uid);
+}
+
+/**
+ *  gradebook_responses_view().
+ *    Add assignment response values to $node->content before rendering.
+ *    Called via hook_nodeapi (view).
+ *  @param $node
+ *    the assignment node
+ *  @param $teaser
+ *    the teaser parameter passed from node_view() 
+ *  @param $page
+ *    the page parameter passed from node_view()
+ *  @return NONE
+ */
+function gradebook_responses_view(&$node, $teaser = FALSE, $page = FALSE) {
+  $node = node_prepare($node, $teaser);
+  $node->content['aid'] = array(
+    '#value' => theme('gradebook_responses_assignment', $node->aid),
+    '#weight' => -100,
+  );
+  $node->content['rstatus'] = array(
+    '#value' => theme('gradebook_responses_status', $node->rstatus),
+    '#weight' => -100,
+  );
+
+  return $node;
+}
+
+/**
+ *  Theme the response_assignment field
+ * 
+ *  @param $possible
+ *    The possible number of points for the assignment
+ *  @return
+ *    The HTML string ready to display
+ */
+function theme_gradebook_responses_assignment($aid) {
+  $node = node_load($aid);
+  $output = '<div class="gradebook-response-assignment">'. t('Response to Assignment') .': ';
+  $output .= '<span class="gradebook-response-assignment-title">'. $node->title .'</span>';
+  $output .= '</div>';
+  return $output;
+}
+/**
+ *  Theme the assignment_status field
+ * 
+ *  @param $rstatus
+ *    The Current status of the assignment response
+ *  @return
+ *    The HTML string ready to display
+ */
+function theme_gradebook_responses_status($rstatus) {
+  $node = node_load($aid);
+  $status_string =_gradebook_responses_status_string();
+  $output = ''; 
+  if (isset($status_string[$rstatus])) {
+    $output = '<div class="gradebook-response-status">'. t('Status of Response') .': ';
+    $output .= '<span class="gradebook-response-status-string">'. $status_string[$rstatus] .'</span>';
+    $output .= '</div>';
+  }
+  return $output;
+}
+
+function _gradebook_responses_status_string() {
+  static $status_string;
+  if (empty($status_string)) {
+    $status_string = array( 0 => t('Not set'), 1 => t('In progress'), 2 => t('Completed'), 3 => t('Graded')
+    );
+  }
+  return $status_string;
+}
+
+/**
+ *  gradebook_responses_form_elements().
+ *    Prepare extra response fields for the node response forms.
+ *    Called via hook_form_alter.
+ *  @param $node
+ *    the response node
+ *  @return $form
+ *    additional form array elements for the assignment create form.
+ */
+function gradebook_responses_form_elements($node) {
+  $form = array();
+  $status_options = _gradebook_responses_status_string();
+  $locked = (isset($node->rstatus) && $node->rstatus == array_pop(array_keys($status_options)));
+    global $user;
+    //$account = user_load(array('uid' => $user->uid));
+    $account = user_load(array('uid' => $node->uid));
+    $options = array();  // get all possible assignments for this user
+    $vid = gradebookapi_get_vid();
+    $result = db_query('SELECT DISTINCT t.tid FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = %d', $vid);
+    while ($tid = db_result($result)) {
+      $gradebook = gradebookapi_gradebook_load($tid);
+      if (gradebookapi_is_student($gradebook, $account)) {
+        // get assignments
+        $res = gradebookapi_select_nodes($gradebook, array(), 'or', 0, FALSE);
+        $assignments = array();
+        if ($res) {
+          while ($assignment = db_fetch_object($res)) {
+            $assignment = node_load($assignment->nid);
+            // TODO: don't include if a grade already exists for this assignment
+            $result_earned = db_query('SELECT earned FROM {gradebookapi_grade} WHERE uid=%d and nid=%d', $account->uid, $assignment->nid);
+            $earned = db_result($result_earned);
+            if (is_null($earned) || $earned == '' || $locked) { // assignment has not been graded, add to options
+              $options[$assignment->nid] = $assignment->title;
+            } 
+          }
+        }
+      }
+    }
+  if (!$locked) {
+    array_pop($status_options);
+  }
+  $form['gradebook_responses'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Assignment Response Settings'),
+      '#tree' => FALSE,
+      '#weight' => 0,
+    );
+
+    $form['gradebook_responses']['aid'] = array(
+      '#type' => 'select',
+      '#title' => t('This is a response to assignment'),
+      '#default_value' => (isset($node->aid) ? $node->aid : NULL),   // verify this
+      '#options' => $options,
+      '#required' => TRUE,
+      '#disabled' => $locked,
+    );
+      //cannot select the last (locked) option
+    $form['gradebook_responses']['rstatus'] = array(
+      '#type' => 'select',
+      '#title' => t('Response Status'),
+      '#default_value' => (isset($node->rstatus) ? $node->rstatus : NULL),   // verify this
+      '#options' => $status_options,
+      '#required' => TRUE,
+      '#disabled' => $locked,
+    );
+  return $form;
+}
+
+
+/**
+ * Implementation of hook_form_alter().
+ *
+ * @return NONE
+ */
+function gradebook_responses_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id == 'gradebookapi_admin_settings') {
+    $form['gradebook_responses_types'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Student Response Types'),
+      '#multiple' => TRUE,
+      '#default_value' => (array)variable_get('gradebook_responses_types', array()),
+      '#options' => array_map('check_plain', node_get_types('names')),
+      '#description' => t('A list of node types you want to treat as student responses.'),
+      '#weight' => -9,
+    );
+  }
+  if (isset($form['type']) && $form['type']['#value'] .'_node_form' == $form_id) {
+    $node = $form['#node'];
+    $types = gradebook_responses_get_response_types();
+    if (in_array($node->type, $types)) {
+      $form = array_merge($form, gradebook_responses_form_elements($node));
+    }
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ *
+ * @return NONE
+ */
+function gradebook_responses_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+  $types = (array)gradebook_responses_get_response_types();
+  if (!empty($types) && in_array($node->type, $types)) {
+    switch ($op) {
+      case 'load':
+        return gradebook_responses_load($node);
+      case 'insert':
+        gradebook_responses_insert($node);
+        break;
+      case 'update':
+        gradebook_responses_update($node);
+        break;
+      case 'delete':
+        gradebook_responses_delete($node);
+        break;
+      case 'view':
+        gradebook_responses_view($node, $a3, $a4);
+        break;
+    }
+  }
+}
+
+function gradebook_responses_assignment_response($nid, $uid) {
+  $responses = gradebook_responses_get_responses( array('aid' => $nid, 'uid' => $uid));
+  $status_string = _gradebook_responses_status_string(); // status text for student responses
+  $rlinks = array();
+  $rtitle = '';
+  if ($n = count($responses) > 0) {
+    $rtitle= format_plural($n, '<br />Response:<br />', '<br />@count Responses:<br />', array('@count' => $n));
+    $i =0;
+    foreach ($responses as $response) {
+      $i++;
+      $rstatus = $response['rstatus'];
+      $rstatustext = $status_string[$rstatus];
+      $rlinks[] = l($i .' ('. $rstatustext .')', 'node/'. $response['nid']);
+    }
+  }
+  return array('title' => $rtitle, 'links' => $rlinks);
+}
+
+function gradebook_responses_update_responses($grade) {
+  // update responses when grade is saved
+  $keys= array_keys($status_string = _gradebook_responses_status_string());
+  $rstatus = 0;
+  $result = db_query("SELECT COUNT(nid) FROM {gradebook_responses} WHERE uid=%d AND aid=%d", $grade->uid, $grade->nid);
+  if (count($result) > 0 ) {
+    $rstatus = array_pop($keys);
+    if (is_numeric($grade->earned)) { // reponse exists and grade has been assigned
+      db_query("UPDATE {gradebook_responses} SET rstatus=%d WHERE uid=%d AND aid=%d", $rstatus, $grade->uid, $grade->nid);
+      drupal_set_message(t('Changed response status to @status for this assignment.', array('@status' => $status_string[$rstatus])));
+    }
+    else { // unlock any locked responses that have null earned grade
+      db_query("UPDATE {gradebook_responses} SET rstatus=%d WHERE uid=%d AND aid=%d AND rstatus=%d", 0, $grade->uid, $grade->nid, $rstatus);
+    }
+  }
+}
+
+/**
+ *  Implementation of hook_gradebook_grade_class().
+ *    return a css class name to style the gradebook_grade_page when an assignment response
+ *    has been submitted.
+ */
+function gradebook_responses_gradebook_grade_class($nid, $uid) {
+  return gradebook_responses_grade_has_response($nid, $uid) ? 'response' : '';
+}
+
+function gradebook_responses_gradebookapi_grade($action, $grade) {
+  switch($action) {
+    case 'set':
+      gradebook_responses_update_responses($grade);
+      break;
+    case 'get':
+      break;
+  }
+}
+
+function gradebook_responses_gradebook_theme_add_content($position, &$form, $id, $teacher) {
+  switch ($position) {
+    case 'title':   //expecting $form = $form['grade'][$id] reference
+      $response = gradebook_responses_assignment_response($form['grade'][$id]['nid']['#value'], $form['grade'][$id]['uid']['#value']);
+      $response_output = empty($response) ? '' : $response['title'] . implode(',<br />', $response['links']);
+      return $response_output;
+  }
+}
+

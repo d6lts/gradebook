@@ -186,23 +186,6 @@ function gradebook_admin_settings() {
     '#collapsed' => FALSE,
   );
 
-  $sel_roles = (array) variable_get('gradebook_attachment_roles', array());
-  $default = array();
-  foreach ($sel_roles as $role => $value) {
-    if ($value) {
-      $default[] = $role;
-    }
-  }
-
-  $form['general']['gradebook_attachment_roles'] = array(
-    '#type' => 'checkboxes',
-    '#title' => t('Grade attachments'),
-    '#default_value' => $default,
-    '#options' => array('teachers' => t('Teachers'), 'students' => t('Students')),
-    '#description' =>  t('Check the gradebook roles that are allowed to attach files to grade entries. Drupal roles with permission to <em>attach files to gradebook</em> are automatically granted permission.'),
-    '#required' => FALSE,
-  );
-
   $form['general']['gradebook_empty_grade'] = array(
     '#type' => 'textfield',
     '#title' => t('Empty grade'),

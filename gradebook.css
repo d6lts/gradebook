@@ -70,6 +70,30 @@
   text-align: center;
 }
 
+.gradebook .grade-response,
+.gradebook .grade-response a {
+  color: #FF0000;
+  text-align: center;
+  font-size: 130%;
+}
+
+.gradebook .grade-attachment,
+.gradebook .grade-attachment a {
+  color: #FF0000;
+  text-align: center;
+  font-weight: bold;
+}
+
+.gradebook .grade-attachment-response,
+.gradebook .grade-response-attachment,
+.gradebook .grade-response-attachment a,
+.gradebook .grade-attachment-response a {
+  color: #FF0000;
+  text-align: center;
+  font-size: 130%;
+  font-weight: bold;
+}
+
 .gradebook .term_grade {
   text-align: center;
   border-bottom: 1px solid #000000;

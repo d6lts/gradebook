@@ -15,7 +15,6 @@ function gradebook_category_page($gradebook) {
   $header = array(t('Name'), t('Operations'));
   $vocabulary = taxonomy_vocabulary_load($vid);
 
-  //drupal_set_title(check_plain($vocabulary->name));
   $start_from      = isset($_GET['page']) ? $_GET['page'] : 0;
   $total_entries   = 0;  // total count for pager
   $page_increment  = 25; // number of tids per page
@@ -28,8 +27,7 @@ function gradebook_category_page($gradebook) {
     if (($start_from && ($start_from * $page_increment) >= $total_entries) || ($displayed_count == $page_increment)) {
       continue;
     }
-    //$rows[] = array(str_repeat('--', $term->depth) .' '. l($term->name, 'gradebook/'. $gradebook->tid ."/category/edit/$term->tid"), l(t('edit'), 'gradebook/'. $gradebook->tid . "/category/edit/$term->tid", array(), $destination));
-    $rows[] = array(str_repeat('--', $term->depth) .' '. $term->name, l(t('edit'), 'gradebook/'. $gradebook->tid .'/catedit/'. $term->tid, array(), $destination));
+    $rows[] = array(str_repeat('--', $term->depth) .' '. $term->name, l('edit', 'gradebook/'. $gradebook->tid .'/catedit/'. $term->tid, array(), $destination));
     $displayed_count++; // we're counting tids displayed
   }
 
@@ -44,7 +42,8 @@ function gradebook_category_page($gradebook) {
     $rows[] = array(array('data' => theme('pager', NULL, $page_increment), 'colspan' => '2'));
   }
 
-  return theme('table', $header, $rows, array('id' => 'taxonomy'));
+  $output = theme('table', $header, $rows, array('id' => 'taxonomy'));
+  return $output;
 }
 
 function gradebook_category_add_page($gradebook) {
@@ -89,7 +88,7 @@ function gradebook_category_form($form_state, $gradebook, $edit = array()) {
 
   $form['weight'] = array(
     '#type' => 'weight',
-    '#title' => t('Weight'),
+    '#title' => t('Listing Weight'),
     '#default_value' => isset($edit['weight']) ? $edit['weight'] : 0,
     '#description' => t('When listing categories, those with with light (small) weights get listed before containers with heavier (larger) weights. Categories with equal weights are sorted alphabetically.')
   );
@@ -172,3 +171,4 @@ function gradebook_confirm_category_delete_submit($form, &$form_state) {
   $form_state['redirect'] ='gradebook/'. $form_state['values']['gid'] .'/catlist';
   return;
 }
+

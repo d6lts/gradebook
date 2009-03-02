@@ -1,9 +1,13 @@
 ; $Id$
-name = Gradebook
-description = "Provides a simple gradebook."
+name = Gradebook Attachments
+description = "Provides file attachments for gradebook assignments."
 package = Gradebook
+dependencies[] = taxonomy
 dependencies[] = gradebookapi
+dependencies[] = gradebook
+dependencies[] = upload
 core = 6.x
+
 
 
 ; Information added by drupal.org packaging script on 2008-12-20

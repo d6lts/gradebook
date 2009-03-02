@@ -1,0 +1,82 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * gradebook_scales.install: Install schema for gradebook_scales
+ */
+
+/**
+ * Implementation of hook_schema().
+ */
+
+function gradebook_scales_schema() {
+
+  $schema['gradebook_scales_calc_method'] = array(
+    'fields' => array(
+      'gid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'calcmethod'  => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+    ),
+    'primary key' => array('gid'),
+  );
+
+  $schema['gradebook_scales_grade_weight'] = array(
+    'fields' => array(
+      'gid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'tid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'gradeweight' => array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE),
+    ),
+    'primary key' => array('gid', 'tid'),
+  );
+
+  $schema['gradebook_scales'] = array(
+    'fields' => array(
+      'sid'         => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+      'gid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'scalename'   => array('type' => 'varchar', 'length' => 32, 'not null' => FALSE),
+    ),
+    'indexes' => array(
+      'gid' => array('gid'),
+    ),
+    'primary key' => array('sid'),
+  );
+
+  $schema['gradebook_scales_data'] = array(
+    'fields' => array(
+      'mid'         => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+      'sid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'min'         => array('type' => 'float', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
+      'max'         => array('type' => 'float', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
+      'mark'        => array('type' => 'varchar', 'length' => 5, 'not null' => FALSE),
+    ),
+    'primary key' => array('mid', 'sid'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implementation of hook_install().
+ */
+
+function gradebook_scales_install() {
+  // Create tables.
+  drupal_install_schema('gradebook_scales');
+  db_add_field($ret, 'gradebookapi_assignment', 'sid', array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE));
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function gradebook_scales_uninstall() {
+
+  // All gradebook UI modules should delete their taxonomy trees
+
+  // Remove tables.
+
+  drupal_uninstall_schema('gradebook_scales');
+  $ret = array();
+  db_drop_field($ret, 'gradebookapi_assignment', 'sid');
+
+  return $ret;
+}

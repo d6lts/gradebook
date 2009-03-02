@@ -1,0 +1,58 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * gradebook_attachments.install: Install schema for gradebook_attachments
+ */
+
+/**
+ * Implementation of hook_schema().
+ */
+
+function gradebook_attachments_schema() {
+  // This was moved from gradebookapi.install
+  // I would like to rename it, but don't see how to do this using the drupal 6 api.
+  $schema['gradebookapi_files'] = array(
+    'fields' => array(
+      'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'fid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'list'        => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny',
+                             'description' => t('Whether the file should be visibly listed on the grade note.'), ),
+      'description' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+    ),
+    'indexes' => array(
+      'nid' => array('nid'),
+      'uid' => array('uid'),
+      'fid' => array('fid'),
+    ),
+    'primary key' => array('fid', 'nid'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implementation of hook_install().
+ */
+
+function gradebook_attachments_install() {
+  // Create tables.
+  drupal_install_schema('gradebook_attachments');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function gradebook_attachments_uninstall() {
+
+  // All gradebook UI modules should delete their taxonomy trees
+
+  // Remove tables.
+
+  drupal_uninstall_schema('gradebook_attachments');
+
+  // Delete all variables.
+  db_query("DELETE FROM {variable} WHERE name LIKE 'gradebook_attachment%%'");
+}

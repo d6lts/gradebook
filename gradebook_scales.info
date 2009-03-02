@@ -1,9 +1,12 @@
 ; $Id$
-name = Gradebook
-description = "Provides a simple gradebook."
+name = Gradebook Scales and Weights
+description = "Provides assignment scales and gradebook category weights."
 package = Gradebook
+dependencies[] = taxonomy
 dependencies[] = gradebookapi
+dependencies[] = gradebook
 core = 6.x
+
 
 
 ; Information added by drupal.org packaging script on 2008-12-20

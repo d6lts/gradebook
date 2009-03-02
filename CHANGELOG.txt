@@ -1,8 +1,19 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-03-01
+----------------------
+* by MGN: restrctured new gradebook features into submodules gradebook_responses, gradebook_attachments,
+  and gradebook_scales. All of these submodules are optional.  
+
 Gradebook 6.x.2.x-dev, 2009-02-25
 ----------------------
 #383664 by MGN: Fixed permission typo: 'admin gradebook' is now 'administer gradebook'.
+* by MGN: Added new feature to assign a student response type, and incorporate links to student
+  responses on the gradebook_grade_form.
+* by MGN: Added new feature to allow teachers to weight gradebook categories in their gradebooks.
+* by MGN: Added new feature to allow teachers to create, edit and assign gradebook scales to assignments.
+* by MGN: Additional themeing of the gradebook_grade_page to alert teacher and student of attachments
+  and/or student responses.
 
 Gradebook 6.x.2.x-dev, 2009-02-24
 ----------------------

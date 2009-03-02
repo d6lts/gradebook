@@ -8,8 +8,6 @@
 
 function gradebookapi_admin_settings() {
   $form = array();
-  $form['#submit'][]= 'gradebookapi_admin_settings_submit'; // custom submit handler
-
   drupal_set_title(t('Gradebook API configuration'));
 
   $vid = gradebookapi_get_vid();
@@ -22,6 +20,7 @@ function gradebookapi_admin_settings() {
     '#default_value' => empty($vocabulary->nodes) ? array(): $vocabulary->nodes,
     '#options' => array_map('check_plain', node_get_types('names')),
     '#description' => t('A list of node types you want to treat as assignments.'),
+    '#weight' => -10,
   );
 
   $intervals = array(
@@ -44,6 +43,7 @@ function gradebookapi_admin_settings() {
     '#required' => FALSE,
     '#prefix' => '<div class="gradebookapi-radios">',
     '#suffix' => '</div><div class="clear-block"></div>',
+    '#weight' => -8,
   );
 
   $usedateapi = module_exists('date_popup');
@@ -53,16 +53,18 @@ function gradebookapi_admin_settings() {
     '#description' => $usedateapi ? t('The <em>Date Popup</em> module is enabled, check the box if you would like to use a Date Popup for date selection.') : t('The <em>Date Popup</em> module is not available. Install and enable it to access this feature.'),
     '#default_value' => $usedateapi ? variable_get('gradebookapi_use_dateapi', FALSE) : FALSE,
     '#disabled' => !$usedateapi,
-  ); 
- 
+    '#weight' => -7,
+  );
+
   $form['gradebookapi_assignments_date_format'] = array(
     '#type' => 'textfield',
     '#title' => t('Date format to use on gradebook page and block'),
     '#default_value' => variable_get('gradebookapi_assignments_date_format', 'm/d/Y'),
     '#description' => t('Define a php date format string like "m/d/Y". See <a href="@php-net-url">http://php.net/date</a> for more details.', array('@php-net-url' => url("http://php.net/date"))),
     '#required' => FALSE,
+    '#weight' => -6,
   );
-
+  $form['#submit'][]= 'gradebookapi_admin_settings_submit'; // custom submit handler
   return system_settings_form($form);
 }
 
