@@ -18,33 +18,16 @@ function gradebook_attachments_perm() {
  * @return NONE
  */
 function gradebook_attachments_user($op, &$edit, &$account, $category = NULL) {
-
-// todo...need to make sure this happens before gradebookapi_user is called...how to do that?
-
   if ($op == 'delete' ) {
     drupal_set_message(t('Deleting gradebook attachments for %name (uid %d) since account is being deleted',  array('%name' => $account->name, '%d' => $account->uid)));
-    // check to see if $account is a student in each gradebook
-    $student_in_any_gradebook = FALSE;
-    $vid = gradebookapi_get_vid();
-    $result = db_query('SELECT DISTINCT t.tid FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = %d', $vid);
-    while ($tid = db_result($result)) {
-      $gradebook = gradebookapi_gradebook_load($tid);
-      if (gradebookapi_is_student($gradebook, $account)) {
-        $student_in_any_gradebook = TRUE;
-        // get assignments
-        $assignments = array();
-        $result = gradebookapi_select_nodes($gradebook, $tids = array());
-        if ($result) {
-          while ($assignment = db_fetch_object($result)) {
-            $files = gradebook_attachments_load($assignment->nid, $account->uid);
-            foreach ($files as $file) {
-              gradebook_attachments_remove_file($file);  // remove the files attached to this users grades
-            }
-          }
-        }
+    $result = db_query('SELECT DISTINCT nid FROM {gradebookapi_files} WHERE uid = %d', $account->uid);
+    while ($nid = db_result($result)) {
+      $files = gradebook_attachments_load_attachment($nid, $account->uid);
+      foreach ($files as $file) {
+        gradebook_attachments_remove_file($file);  // remove the files attached to this users grades
       }
-      watchdog('gradebook_attachments', 'Deleted gradebook files for %name (uid %d) upon deletion of account.', array('%name' => $account->name, '%d' => $account->uid), WATCHDOG_INFO);
     }
+    watchdog('gradebook_attachments', 'Deleted gradebook files for %name (uid %d) upon deletion of account.', array('%name' => $account->name, '%d' => $account->uid), WATCHDOG_INFO);
   }
 }
 
@@ -123,10 +106,12 @@ function gradebook_attachments_manage_attachments($grade) {
 
 function gradebook_attachments_remove_file($file) {
   if (isset($file->fid)) {
+    drupal_set_message(t('Removing file %name from gradebookapi_files', array('%name' => $file->filename)));
     db_query('DELETE FROM {gradebookapi_files} WHERE fid=%d', $file->fid);
     // If the file isn't used by any other grades delete it.
     $count = db_result(db_query('SELECT COUNT(fid) FROM {gradebookapi_files} WHERE fid=%d', $file->fid));
     if ($count < 1) {
+      drupal_set_message(t('Deleting file %name since its no longer in use.', array('%name' => $file->filename)));
       file_delete($file->filepath);
       db_query('DELETE FROM {files} WHERE fid=%d', $file->fid);
     }

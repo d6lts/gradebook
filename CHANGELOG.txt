@@ -1,5 +1,11 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-03-04
+----------------------
+* by MGN: Changed weight of gradebook submodules so they are greater (hooks are called after) gradebookapi.
+* by MGN: Rewrote gradebook_attachments hook_user to remove database records and remove files when a users
+  account is deleted.
+
 Gradebook 6.x.2.x-dev, 2009-03-01
 ----------------------
 * by MGN: restrctured new gradebook features into submodules gradebook_responses, gradebook_attachments,

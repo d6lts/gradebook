@@ -650,14 +650,11 @@ function gradebookapi_assignment_insert($node) {
 
   $now = time();
   $node->status =  ($now > $node->publish_date) ? 1 : 0;
-  if (db_result(db_query('SELECT * FROM {gradebookapi_assignment} a WHERE a.nid = %d', $node->nid))) {
-    gradebookapi_assignment_update($node);
-  }  
-  else { // assignment doesn't exist in gradebookapi_assignment table, so insert it
-    db_query("INSERT INTO {gradebookapi_assignment} (nid, possible, publish_date, due_date) VALUES (%d, %f, '%d', '%d')", $node->nid, $node->possible, $node->publish_date, $node->due_date);
-  }
-  // we have to manually update terms as we can't control module order
 
+  // this assumes that gradebookapi has a lighter weight than any submodules so it is called first:
+  db_query("INSERT INTO {gradebookapi_assignment} (nid, possible, publish_date, due_date) VALUES (%d, %f, '%d', '%d')", $node->nid, $node->possible, $node->publish_date, $node->due_date);
+
+  // we have to manually update terms as we can't control module order
   taxonomy_node_save($node, $node->taxonomy);
   gradebookapi_calc_assignment_grades($node);
 }

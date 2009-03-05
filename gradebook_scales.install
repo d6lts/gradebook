@@ -63,6 +63,10 @@ function gradebook_scales_install() {
   // Create tables.
   drupal_install_schema('gradebook_scales');
   db_add_field($ret, 'gradebookapi_assignment', 'sid', array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE));
+
+  // Insure that submodules have a greater weight than gradebookapi
+  $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
+  db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_scales'", $weight + 1);
 }
 
 /**
@@ -79,4 +83,10 @@ function gradebook_scales_uninstall() {
   db_drop_field($ret, 'gradebookapi_assignment', 'sid');
 
   return $ret;
+}
+
+function gradebook_scales_update_6001() {
+  // Insure that submodules have a greater weight than gradebookapi
+  $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
+  db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_scales'", $weight + 1);
 }

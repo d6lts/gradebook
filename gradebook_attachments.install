@@ -40,6 +40,10 @@ function gradebook_attachments_schema() {
 function gradebook_attachments_install() {
   // Create tables.
   drupal_install_schema('gradebook_attachments');
+
+  // Insure that submodules have a greater weight than gradebookapi
+  $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
+  db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_attachments'", $weight + 1);
 }
 
 /**
@@ -55,4 +59,10 @@ function gradebook_attachments_uninstall() {
 
   // Delete all variables.
   db_query("DELETE FROM {variable} WHERE name LIKE 'gradebook_attachment%%'");
+}
+
+function gradebook_attachments_update_6001() {
+  // Insure that submodules have a greater weight than gradebookapi
+  $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
+  db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_attachments'", $weight + 1);
 }
