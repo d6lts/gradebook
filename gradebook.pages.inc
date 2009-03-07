@@ -91,6 +91,7 @@ function gradebook_grade_form($form_state, $gradebook, $grades) {
   foreach ($grades as $id => $grade) {
     $account = user_load(array('uid' => $grade['uid']));
     $node = node_load($grade['nid']);
+    $form['grade'][$id]['#node'] = $node;  // make available for hook_form_alter
     $form['grade'][$id]['uid'] = array('#type' => 'value', '#value' => $account->uid);  // must be '#type' => value
     $form['grade'][$id]['nid'] = array('#type' => 'value', '#value' => $node->nid);     // must be '#type' => value
     $form['grade'][$id]['user'] = array('#value' => $account->name);

@@ -118,6 +118,17 @@ function gradebook_menu() {
     'weight'             => -10,
   );
 
+// Have a gradebook settings for control of local gradebook display
+  $items['gradebook/%gradebookapi_gradebook/settings'] = array(
+    'title' => 'Settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('gradebook_teacher_settings', 1),
+    'access callback' => 'gradebookapi_is_teacher',
+    'access arguments' => array(1),
+    'weight' => -1,
+    'type' => MENU_LOCAL_TASK,
+  );
+
   $items['gradebook/%gradebookapi_gradebook/catlist'] = array(
     'title'              => 'list categories',
     'page callback'      => 'gradebook_category_page',
@@ -450,8 +461,10 @@ function gradebook_gradebook_page($gradebook, $uid = NULL, $export = FALSE) {
   $assignments = array();
   $student_grades = array();
   $assignment_order = array();
-  $order = isset($_GET['order']) ? $_GET['order'] : '';
-  $sort = isset($_GET['sort']) ? (($_GET['sort'] == 'desc') ? 'DESC' : 'ASC') : 'ASC';
+  $default_order = variable_get('gradebook_page_order', array());
+  $order = isset($_GET['order']) ? $_GET['order'] : isset($default_order[$gradebook->tid]) ? $default_order[$gradebook->tid] : '';
+  $default_sort = variable_get('gradebook_page_sort', array());
+  $sort = isset($_GET['sort']) ? (($_GET['sort'] == 'desc') ? 'DESC' : 'ASC') : isset($default_sort[$gradebook->tid]) ? $default_sort[$gradebook->tid] : 'ASC';
 
   // make sure we have permission to be here
   if (!gradebookapi_is_teacher($gradebook) && !empty($uid)) {
@@ -836,4 +849,66 @@ function _gradebook_block_view($delta) {
   return $block;
 }
 
+/**
+ *  Local gradebook display configurable by teacher
+ *
+ */
+function gradebook_teacher_settings($form_state, $gradebook) {
+  $form = array();
+
+  drupal_set_title(t('Gradebook configuration'));
+  $form['#gid'] = $gradebook->tid;
+  $form['local'] = array(
+    '#type'        => 'fieldset',
+    '#title'       => t('Local gradebook settings'),
+    '#weight'      => -1,
+    '#collapsible' => TRUE,
+    '#collapsed'   => FALSE,
+    '#description' => t('These settings apply only to this gradebook.'),
+  );
+
+  if (!is_array($form['local']['gradebook_page_order'])) {
+    $form['local']['gradebook_page_order'] = array(
+      '#tree' => TRUE,
+    );
+    $form['local']['gradebook_page_sort'] = array(
+      '#tree' => TRUE,
+    );
+  }
+
+  $default = variable_get('gradebook_page_order', array());
+  if (!isset($default[$gradebook->tid])) {
+    $default[$gradebook->tid] = 'category';
+  }
+  $form['local']['gradebook_page_order'][$gradebook->tid] = array(
+    '#type'        => 'radios',
+    '#title'       => t('Default sort order of gradebook page'),
+    '#type' => 'radios',
+    '#options' => array('category' => t('Alphabetically by Category'),
+                        'title' => t('Alphabetically by Assignment Title'),
+                        'due' => t('Due Date'),
+                        'publish' => t('Publish Date'),
+                        'possible' => t('Points Possible'), ),
+    '#default_value' => $default[$gradebook->tid],
+    '#description' => t('Select the default order to sort the gradebook page.'),
+    '#required' => FALSE,
+  );
+
+  $default = variable_get('gradebook_page_sort', array());
+  if (!isset($default[$gradebook->tid])) {
+    $default[$gradebook->tid] = 'asc';
+  }
+
+  $form['local']['gradebook_page_sort'][$gradebook->tid] = array(
+    '#type'        => 'radios',
+    '#title'       => t('Default sort direction of gradebook page'),
+    '#type'        => 'radios',
+    '#options'     => array('asc' => t('Ascending'), 'desc' => t('Descending'), ),
+    '#default_value' => $default[$gradebook->tid],
+    '#description' => t('Select the default order to sort the gradebook page.'),
+    '#required' => FALSE,
+  );
+
+  return system_settings_form($form);
+}
 

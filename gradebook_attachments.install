@@ -41,6 +41,8 @@ function gradebook_attachments_install() {
   // Create tables.
   drupal_install_schema('gradebook_attachments');
 
+  // add field to gradebookapi_assignment to determine if attachments are allowed for a given assignment
+  db_add_field($ret, 'gradebookapi_assignment', 'attach_status', array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'size' => 'tiny'));
   // Insure that submodules have a greater weight than gradebookapi
   $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
   db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_attachments'", $weight + 1);
@@ -53,16 +55,34 @@ function gradebook_attachments_uninstall() {
 
   // All gradebook UI modules should delete their taxonomy trees
 
-  // Remove tables.
+  // Remove added fields
+  $ret = array();
+  db_drop_field($ret, 'gradebookapi_assignment', 'attach_status');
 
+  // Remove all attached files when module is uninstalled
+  $result = db_query('SELECT DISTINCT nid FROM {gradebookapi_files}');
+  while ($nid = db_result($result)) {
+    $files = gradebook_attachments_load_attachment($nid);
+    foreach ($files as $file) {
+      gradebook_attachments_remove_file($file);
+    }
+  }
+
+  // Remove tables
   drupal_uninstall_schema('gradebook_attachments');
 
   // Delete all variables.
   db_query("DELETE FROM {variable} WHERE name LIKE 'gradebook_attachment%%'");
+  return $ret;
 }
 
 function gradebook_attachments_update_6001() {
   // Insure that submodules have a greater weight than gradebookapi
   $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
   db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_attachments'", $weight + 1);
+}
+
+function gradebook_attachments_update_6002() {
+  // add field to gradebookapi_assignment to determine if attachments are allowed for a given assignment
+  db_add_field($ret, 'gradebookapi_assignment', 'attach_status', array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'size' => 'tiny'));
 }

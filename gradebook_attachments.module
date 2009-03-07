@@ -124,7 +124,7 @@ function gradebook_attachments_remove_file($file) {
  * @return NONE
  */
 function gradebook_attachments_form_alter(&$form, $form_state, $form_id) {
-  if ($form_id == 'gradebook_admin_settings') {
+  if ($form_id == 'gradebook_admin_settings') { // add attachment options to the sitewide gradebook settings form
     $sel_roles = (array) variable_get('gradebook_attachment_roles', array());
     $default = array();
     foreach ($sel_roles as $role => $value) {
@@ -141,6 +141,34 @@ function gradebook_attachments_form_alter(&$form, $form_state, $form_id) {
       '#required' => FALSE,
     );
   }
+  if ($form_id == 'gradebook_teacher_settings') { // add options to the local gradebook settings form
+    $gid = $form['#gid'];
+    if (!is_array($form['local']['gradebook_attachment_settings'])) {
+      $form['local']['gradebook_attachment_settings'] = array('#tree' => TRUE, );
+    }
+    $default = variable_get('gradebook_attachment_settings', array());
+    if (!isset($default[$gid])) {
+      $default[$gid] = 0;
+    }
+    $form['local']['gradebook_attachment_settings'][$gid] = array(
+      '#title' => t('Restrictions on student attachments'),
+      '#type' => 'radios',
+      '#options' => array(0 => t('Allow student attachments at all times'),
+                          1 => t('Disable student attachments after due date has passed'),
+                          2 => t('Disable student attachments after assignment has been graded'),
+                          3 => t('Do not allow student attachments'), ),
+      '#default_value' => $default[$gid],
+      '#description' => t('Select default restrictions on student attachments. Restrictions selected for individual assignments will override this default behavior.'),
+      '#required' => TRUE,
+    );
+  }
+  if (isset($form['type']) && $form['type']['#value'] .'_node_form' == $form_id) {
+    $node = $form['#node'];
+    $types = gradebookapi_get_assignment_types();
+    if (in_array($node->type, $types)) {
+      $form = array_merge($form, gradebook_attachments_form_elements($node));
+    }
+  }
 }
 
 /**
@@ -152,8 +180,11 @@ function gradebook_attachments_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
   if (in_array($node->type, (array)gradebookapi_get_assignment_types())) {
     switch ($op) {
       case 'load':
+        $additions=db_fetch_array(db_query('SELECT attach_status FROM {gradebookapi_assignment} WHERE nid=%d', $node->nid));
+        return $additions;
       case 'insert':
       case 'update':
+        db_query("UPDATE {gradebookapi_assignment} SET attach_status=%d WHERE nid=%d", $node->attach_status, $node->nid);
         break;
       case 'delete':  //remove file attachments and delete any unused files
         $files = gradebook_attachments_load_attachment($node->nid);
@@ -177,6 +208,9 @@ function gradebook_attachments_gradebook_grade_class($nid, $uid) {
   return gradebook_attachments_grade_has_attachment($nid, $uid) ? 'attachment' : '';
 }
 
+/**
+ * Implementation of hook_gradebook_form_add_elements().
+ */
 function gradebook_attachments_gradebook_form_add_elements(&$form, &$form_state, $grades, $gradebook) {
     global $user;
     $teacher = gradebookapi_is_teacher($gradebook);
@@ -190,16 +224,41 @@ function gradebook_attachments_gradebook_form_add_elements(&$form, &$form_state,
           $grade['files'][$file['fid']] = $file;
         }
       }
+      $node = $form['grade'][$id]['#node'];
+      $gradebook_attach_restrictions = variable_get('gradebook_attachment_settings', array());
+      $attach_restrictions = (is_null($node->attach_status) || $node->attach_status == 4) ? $gradebook_attach_restrictions[$gradebook->tid] : $node->attach_status;
+      if (!$teacher && isset($attach_restrictions)) {
+        switch ($attach_restrictions) {
+          case 1:  // no attachments after due date
+            if ( time() > $node->due_date) {
+              $attach_permission = FALSE;
+            }
+            break;
+          case 2:  // no attachment after assignment has been graded
+            if ($form['grade'][$id]['earned'] != '') {
+              $attach_permission = FALSE;
+            }
+            break;
+          case 3:  // no attachments permitted
+            $attach_permission = FALSE;
+            break;
+          case 0:  // no additional restrictions
+          default:
+        }
+      }
       $form['grade'][$id]['attachments'] = array(
         '#prefix' => '<div id="gradebook-attachments">',
         '#suffix' => '</div>',
       );
-      $form['grade'][$id]['attachments'] += gradebook_attachments_upload_form($id, $grade, $teacher);
+      $form['grade'][$id]['attachments'] += gradebook_attachments_upload_form($id, $grade, $teacher, $attach_permission);
     }
     if ($attach_permission) {
 
       // Make sure necessary directories exist and are writable before displaying the attachment form.
-      $path = file_directory_path();
+      $path = file_directory_path() .'/gradebook_attachments';
+      file_check_directory($path, FILE_CREATE_DIRECTORY); // make sure the gradebook_attachments subdir exists
+      $path .= '/'. $gradebook->tid;  // save files under gradebook tid
+      $form['new']['#gapath'] = $path;  // save path for when the file is saved
       $temp = file_directory_temp();
       if (!file_check_directory($path, FILE_CREATE_DIRECTORY) || !file_check_directory($temp, FILE_CREATE_DIRECTORY)) {
         $form['new']['#description'] =  t('File attachments are disabled. The file directories have not been properly configured.');
@@ -231,7 +290,7 @@ function gradebook_attachments_gradebook_form_add_elements(&$form, &$form_state,
     $form['gradeid'] = (count($options) > 1) ? array('#type' => 'radios', '#required' => FALSE, '#options' => $options) : array('#type' => 'value', '#value' => $id);
 }
 
-function gradebook_attachments_upload_form($id, $edit, $teacher = FALSE) {
+function gradebook_attachments_upload_form($id, $edit, $teacher = FALSE, $edit_permission = TRUE) {
   $form = array('#cache' => TRUE);
   $files = isset($edit['files']) ? $edit['files'] : array();
 
@@ -240,7 +299,8 @@ function gradebook_attachments_upload_form($id, $edit, $teacher = FALSE) {
     global $user;
     foreach ($files as $key => $file) {
       $file = (object)$file;
-      $allow_edit = $teacher  || ($user->uid == $file->uid);  // users can edit their own uploads, teachers can edit all
+      // users can edit their own uploads, teachers can edit all
+      $allow_edit = $teacher  || ($edit_permission && ($user->uid == $file->uid));
       if ($allow_edit) { // display the form elements
         $form['files'][$key]['description'] = array('#type' => 'textfield', '#default_value' => !empty($file->description) ? $file->description : $file->filename, '#size' => 25, '#maxlength' => 255);
         $form['files'][$key]['remove'] = array('#type' => 'checkbox', '#default_value' => !empty($file->remove));
@@ -251,6 +311,7 @@ function gradebook_attachments_upload_form($id, $edit, $teacher = FALSE) {
         $form['files'][$key]['remove'] = array('#type' => 'value', '#value' => !empty($file->remove));
         $form['files'][$key]['list'] = array('#type' => 'value', '#value' => $file->list);
       }
+      $form['files'][$key]['#date']    = format_date($file->timestamp, 'custom', "F j, Y, g:i a");
       $form['files'][$key]['size']     = array('#type' => 'value', '#value' => format_size($file->filesize));
       $form['files'][$key]['filename'] = array('#type' => 'value', '#value' => $file->filename);
       $form['files'][$key]['filepath'] = array('#type' => 'value', '#value' => $file->filepath);
@@ -274,7 +335,8 @@ function gradebook_attachments_upload_form_attach_another($form, &$form_state) {
     'file_validate_size' => array($limits['file_size'], $limits['user_size']),
   );
   // Save new file uploads.
-  if ($form_state['values']['attach permission'] && ($file = file_save_upload('upload', $validators, file_directory_path()))) {
+  $save_path = $form['new']['#gapath'];
+  if ($form_state['values']['attach permission'] && ($file = file_save_upload('upload', $validators, $save_path))) {
     $id = $form_state['values']['gradeid'];
     $file->list = 1; // list files by default
     $file->saved = FALSE;
@@ -302,7 +364,7 @@ function gradebook_attachments_gradebook_theme_add_content($position, &$form, $i
     case 'note':
       $keys = element_children($form['grade'][$id]['attachments']['files']);
       if (count($keys) > 0) {  // show attachment table if files are attached
-        $attachment_header = array(t('Attachment'), t('Link'), t('List'), t('Remove'));
+        $attachment_header = array(t('Attachment'), t('Uploaded on'), t('Link'), t('List'), t('Remove'));
         $attachment_rows = NULL;
         foreach ($keys as $key) {
           $view_row = $form['grade'][$id]['attachments']['files'][$key]['list']['#value'] ||
@@ -314,6 +376,7 @@ function gradebook_attachments_gradebook_theme_add_content($position, &$form, $i
                                  $form['grade'][$id]['attachments']['files'][$key]['description']['#value'] :
                                  drupal_render($form['grade'][$id]['attachments']['files'][$key]['description']);
             $attachment_row[] = $description;
+            $attachment_row[] = $form['grade'][$id]['attachments']['files'][$key]['#date'];
             $attachment_row[] = l('View', $form['grade'][$id]['attachments']['files'][$key]['filepath']['#value']);
             $attachment_row[] = drupal_render($form['grade'][$id]['attachments']['files'][$key]['list']);
             $attachment_row[] = drupal_render($form['grade'][$id]['attachments']['files'][$key]['remove']);
@@ -327,4 +390,28 @@ function gradebook_attachments_gradebook_theme_add_content($position, &$form, $i
       $output =  drupal_render($form['new']['upload']) . drupal_render($form['new']['attach']);
       return $output;
   }
+}
+
+function gradebook_attachments_form_elements($node) {
+  $form = array();
+  $options = array(0 => t('Allow student attachments at all times'),
+                   1 => t('Disable student attachments after due date has passed'),
+                   2 => t('Disable student attachments after assignment has been graded'),
+                   3 => t('Do not allow student attachments'),
+                   4 => t('Use gradebook settings default'), );
+  $form['gradebook_attachments'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Assignment Attachment Settings'),
+      '#tree' => FALSE,
+      '#weight' => 0,
+    );
+
+    $form['gradebook_attachments']['attach_status'] = array(
+      '#type' => 'select',
+      '#title' => t('Restrict student attachments'),
+      '#default_value' => (isset($node->attach_status) ? $node->attach_status : 4),
+      '#options' => $options,
+      '#required' => TRUE,
+    );
+  return $form;
 }

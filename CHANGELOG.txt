@@ -1,5 +1,16 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-03-07
+----------------------
+#392262 by MGN: Modified gradebook_attachments to save files to subdirectory according to gradebook tid.
+#392262 by MGN: Modified gradebook_attachments_gradebook_theme_add_content to display upload time.
+* by MGN: Added a per-gradebook settings menu local task to allow per-gradebook configuration. Submodules
+  can add form elements to the settings tab using hook_form_alter.
+* by MGN: Added feature to allow teachers to set the default sort order for individual gradebooks.
+* by MGN: Added feature to allow teachers to place restrictions on when students can attach files to grades.
+  Restrictions can be set for individual gradebooks (default) as well as for assignments individually.
+* by MGN: All files attached to grades are automatically deleted when gradebook_attachments is uninstalled.
+
 Gradebook 6.x.2.x-dev, 2009-03-04
 ----------------------
 * by MGN: Changed weight of gradebook submodules so they are greater (hooks are called after) gradebookapi.

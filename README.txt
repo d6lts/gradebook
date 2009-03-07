@@ -141,6 +141,8 @@ III.  Usage (for students and teachers)
       iii. Exempt a student from the assignment, by checking the box. When this box is checked,
            the scores for the assignment are not used to calculate the student's grade.
       iv. Click 'Save All' to save the grade and return to the gradebook page.
+   d. Configure individual gradebook settings (such as default gradebook sort order) through the
+      Settings tab. Submodules may add additional per-gradebook settings through this form.
 4. If a student clicks on their grade, they are brought to a grade summary page, which 
    includes the assignment data as well as any note provided by the teacher. 
    A button at the bottom of this page brings the student back to the gradebook. 
@@ -156,12 +158,24 @@ IV. Description of Optional Submodules
 1.  Gradebook Attachments allows teachers and/or users to attach files to grades. 
     A. This module provides 'attach files to gradebook' permission. Any role granted this permission
        can attach files. Alternatively, it may be more convenient to grant this permission from the 
-       Gradebook Settings page at Administer >> Gradebook >> Gradebooks >> Settings  
+       sitewide Gradebook Settings page at Administer >> Gradebook >> Gradebooks >> Settings  
        (admin/gradebook/gradebook/settings).
     B. To attach a file to one of the grades, first select the grade by clicking on the radio button 
-       in the left column. Note that if there is only one student, radio buttons will not appear. Then, 
+       in the left column. Note that if there is only one grade, radio buttons will not appear. Then, 
        browse to find the file and finally press the attach button to add the file to the grade record.
     C. The file is not attached untile the 'Save All' button has been pressed.
+    D. Files are saved in a gradebook_attachments subdirectory of the site files directory, according
+       to gradebook id (taxonomy term id). For example: All files attached to gradebook with term id 66
+       can be found in files/gradebook_attachments/66.
+    E. Grades with attachments are emphasized on the gradebook page using a css style. The default emphasis
+       can be adjusted by editing the gradebook.css file.
+    E. Restrictions can be placed on student attachments. The default behavoir for an individual gradebook
+       is set through the settings tab on the gradebook page. Teachers can override this default behavior
+       by setting the attachments restrictions when creating assignments. Options include: do not permit
+       attachments after the due date, do not permit attachments after a grade has been given, and do
+       not permit attachments (at all).
+    G. NOTE: When the module is uninstalled, all gradebook attachments will be deleted.
+    H. NOTE: When a student's account is deleted, all attachments to the student's grades will be deleted.
 
 2.  Gradebook Responses can be enabled to assign a custom content type to allow students to respond
     assignments. 
@@ -174,6 +188,8 @@ IV. Description of Optional Submodules
     D. When a grade is given for an assignment with a response, the state of the response node is changed
        to graded, and students cannot modify these form elements anymore. (I am still developing these 
        ideas, so feedback / use cases are welcomed).
+    E. Grades with responses are emphasized on the gradebook page using a css style. The default emphasis
+       can be adjusted by editing the gradebook.css file.
 
 3.  Gradebook Scales and Weights allows teachers to define grading scales, i.e. letter grades mapped to 
     numerical point ranges. Category weighting, in calculating the total grade, can also be done for each
