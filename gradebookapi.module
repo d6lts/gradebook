@@ -960,7 +960,7 @@ function gradebookapi_form_alter(&$form, $form_state, $form_id) {
     // are we an assignment type?
     if (!empty($types)) {
       if (in_array($node->type, $types)) {
-        $form = array_merge($form, gradebookapi_assignment_form_elements($node));
+        $form += gradebookapi_assignment_form_elements($node);
       } 
     }
   }

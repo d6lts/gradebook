@@ -279,7 +279,7 @@ function gradebook_responses_form_alter(&$form, $form_state, $form_id) {
     $node = $form['#node'];
     $types = gradebook_responses_get_response_types();
     if (in_array($node->type, $types)) {
-      $form = array_merge($form, gradebook_responses_form_elements($node));
+      $form += gradebook_responses_form_elements($node);
     }
   }
 }

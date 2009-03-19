@@ -1,5 +1,10 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-03-19
+----------------------
+#404718 by MGN: File attachments to assignment nodes doesn't work. Fixed this bug by replacing array_merge 
+with array summation in hook_form_alter for attachment nodes.
+
 Gradebook 6.x.2.x-dev, 2009-03-07
 ----------------------
 #392262 by MGN: Modified gradebook_attachments to save files to subdirectory according to gradebook tid.

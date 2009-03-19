@@ -374,7 +374,7 @@ function gradebook_scales_form_alter(&$form, $form_state, $form_id) {
     $types = gradebookapi_get_assignment_types();
     if (!empty($types)) { // are we an assignment type?
       if (in_array($node->type, $types)) {
-        $form = array_merge($form, gradebook_scales_assignment_form_elements($node));
+        $form += gradebook_scales_assignment_form_elements($node);
       } 
     }
   }
