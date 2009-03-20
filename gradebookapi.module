@@ -745,7 +745,6 @@ function gradebookapi_assignment_delete($node) {
  *  @return NONE
  */
 function gradebookapi_assignment_view(&$node, $teaser = FALSE, $page = FALSE) {
-  $node = node_prepare($node, $teaser);
   $node->content['possible'] = array(
     '#value' => theme('gradebookapi_assignment_possible', $node->possible),
     '#weight' => -100,
@@ -757,8 +756,6 @@ function gradebookapi_assignment_view(&$node, $teaser = FALSE, $page = FALSE) {
 
   // TODO: Check to see if user has a note or attached file in the gradebook for this
   // assignment and provide a note for them so they can go and retrieve it.
-
-  return $node;
 }
 
 /**

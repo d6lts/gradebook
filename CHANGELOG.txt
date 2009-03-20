@@ -4,6 +4,8 @@ Gradebook 6.x.2.x-dev, 2009-03-19
 ----------------------
 #404718 by MGN: File attachments to assignment nodes doesn't work. Fixed this bug by replacing array_merge 
 with array summation in hook_form_alter for attachment nodes.
+#407810 by MGN: Removed calls to node_prepare in gradebookapi and gradebook_responses.
+* by MGN: Renamed gradebook_responses_nodeapi helper functions to avoid confusion with hook functions.
 
 Gradebook 6.x.2.x-dev, 2009-03-07
 ----------------------

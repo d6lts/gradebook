@@ -15,11 +15,15 @@ function gradebook_responses_theme() {
   );
 }
 
+/**
+ * Implementation of hook_user().
+ */
 function gradebook_responses_user($op, &$edit, &$account, $category = NULL) {
   if ($op == 'delete' ) {
     // do something with gradebook responses...parallel what is done in gradebookapi
   }
 }
+
 /**
  *  gradebook_responses_get_response_types
  *  @return 
@@ -60,7 +64,7 @@ function gradebook_responses_grade_has_response($nid, $uid) {
 }
 
 /**
- *  gradebook_responses_load().
+ *  _gradebook_responses_load().
  *    Retrieve the additional form fields from the gradebook_responses database table.
  *    These fields will be added to response create node form.
  *    Called via hook_nodeapi (load).
@@ -69,43 +73,43 @@ function gradebook_responses_grade_has_response($nid, $uid) {
  *  @return
  *    an array of form default values
  */
-function gradebook_responses_load($node) {
+function _gradebook_responses_load($node) {
   $additions = gradebook_responses_get_responses(array('nid' => $node->nid));
   return array_pop($additions);
 }
 
 /**
- *  gradebook_responses_insert().
+ *  _gradebook_responses_insert().
  *    Insert additional assignment fields into the gradebook_responses database table.
  *    Called via hook_nodeapi (insert).
  *  @param $node
  *    the assignment node
  *  @return NONE
  */
-function gradebook_responses_insert($node) {
+function _gradebook_responses_insert($node) {
   db_query("INSERT INTO {gradebook_responses} (nid, aid, uid, rstatus) VALUES (%d, %d, %d, %d)", $node->nid, $node->aid, $node->uid, $node->rstatus);
 }
 
 /**
- *  gradebook_responses_update().
+ *  _gradebook_responses_update().
  *    Update additional response fields in the gradebook_responses database table when the node is updated.
  *    Called via hook_nodeapi (update).
  *  @param $node
  *    the assignment node
  *  @return NONE
  */
-function gradebook_responses_update(&$node) {
+function _gradebook_responses_update(&$node) {
 
   if (db_result(db_query('SELECT * FROM {gradebook_responses} a WHERE a.nid = %d AND a.uid=%d', $node->nid, $node->uid))) {
     db_query("UPDATE {gradebook_responses} SET aid = %d, rstatus = %d WHERE nid = %d AND uid =%d", $node->aid, $node->rstatus, $node->nid, $node->uid); 
   }
   else { // assignment doesn't exist in gradebook_responses table for this user, so insert it
-    gradebook_responses_insert($node);
+    _gradebook_responses_insert($node);
   }
 }
 
 /**
- *  gradebook_responses_delete().
+ *  _gradebook_responses_delete().
  *    Delete response field values from the gradebook_responses database table when the node is deleted.
  *    The grades are then recalculated.
  *    Called via hook_nodeapi (delete).
@@ -114,13 +118,13 @@ function gradebook_responses_update(&$node) {
  *  @return
  *    NONE
  */
-function gradebook_responses_delete($node) {
+function _gradebook_responses_delete($node) {
   // delete records for all students for this assignment node
   db_query('DELETE FROM {gradebook_responses} WHERE nid = %d AND uid = %d', $node->nid, $node->uid);
 }
 
 /**
- *  gradebook_responses_view().
+ *  _gradebook_responses_view().
  *    Add assignment response values to $node->content before rendering.
  *    Called via hook_nodeapi (view).
  *  @param $node
@@ -131,8 +135,7 @@ function gradebook_responses_delete($node) {
  *    the page parameter passed from node_view()
  *  @return NONE
  */
-function gradebook_responses_view(&$node, $teaser = FALSE, $page = FALSE) {
-  $node = node_prepare($node, $teaser);
+function _gradebook_responses_view(&$node, $teaser = FALSE, $page = FALSE) {
   $node->content['aid'] = array(
     '#value' => theme('gradebook_responses_assignment', $node->aid),
     '#weight' => -100,
@@ -141,8 +144,6 @@ function gradebook_responses_view(&$node, $teaser = FALSE, $page = FALSE) {
     '#value' => theme('gradebook_responses_status', $node->rstatus),
     '#weight' => -100,
   );
-
-  return $node;
 }
 
 /**
@@ -294,18 +295,18 @@ function gradebook_responses_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
   if (!empty($types) && in_array($node->type, $types)) {
     switch ($op) {
       case 'load':
-        return gradebook_responses_load($node);
+        return _gradebook_responses_load($node);
       case 'insert':
-        gradebook_responses_insert($node);
+        _gradebook_responses_insert($node);
         break;
       case 'update':
-        gradebook_responses_update($node);
+        _gradebook_responses_update($node);
         break;
       case 'delete':
-        gradebook_responses_delete($node);
+        _gradebook_responses_delete($node);
         break;
       case 'view':
-        gradebook_responses_view($node, $a3, $a4);
+        _gradebook_responses_view($node, $a3, $a4);
         break;
     }
   }
