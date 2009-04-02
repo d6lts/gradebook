@@ -531,7 +531,7 @@ function gradebookapi_get_weights($gid) {
 function gradebookapi_calc_term_grades($tid, $recursive=TRUE) {
   $gradebook = gradebookapi_get_tid_gradebook($tid);
   $students = gradebookapi_get_students($gradebook);
-  if ($str_uids = implode(',', $students)) {
+  if ($str_uids = implode(',', $students['uid'])) {
     $result = db_query("SELECT u.uid FROM {users} u WHERE u.status <> 0 AND u.uid IN (". $str_uids .") ORDER BY u.name ASC");
   }
   else {
@@ -715,7 +715,7 @@ function gradebookapi_assignment_delete($node) {
   // delete records for all students for this assignment node
   db_query('DELETE FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid);
   // delete grades for all users for this assignment node
-  db_query('DELETE FROM {gradebookapi_grade} WHERE nid = %d', $node->nid);
+     db_query('DELETE FROM {gradebookapi_grade} WHERE nid = %d', $node->nid);
 
   // If taxonomy_node_delete has already been called, then we loose the info in
   // {term_node} needed to recalculate the grade instead, gather the gradebook api
@@ -745,7 +745,7 @@ function gradebookapi_assignment_delete($node) {
  *  @return NONE
  */
 function gradebookapi_assignment_view(&$node, $teaser = FALSE, $page = FALSE) {
-  $node->content['possible'] = array(
+ $node->content['possible'] = array(
     '#value' => theme('gradebookapi_assignment_possible', $node->possible),
     '#weight' => -100,
   );
@@ -756,6 +756,7 @@ function gradebookapi_assignment_view(&$node, $teaser = FALSE, $page = FALSE) {
 
   // TODO: Check to see if user has a note or attached file in the gradebook for this
   // assignment and provide a note for them so they can go and retrieve it.
+
 }
 
 /**
@@ -1037,7 +1038,7 @@ function gradebookapi_is_student($gradebook, $account = NULL) {
   }
 
   $students = gradebookapi_get_students($gradebook);
-  if (in_array($account->uid, $students)) {
+  if (in_array($account->uid, $students['uid'])) {
     return TRUE;
   }
 
@@ -1068,7 +1069,7 @@ function gradebookapi_is_teacher($gradebook, $account = NULL) {
   }
 
   $teachers = gradebookapi_get_teachers($gradebook);
-  if (in_array($account->uid, $teachers)) {
+  if (in_array($account->uid, $teachers['uid'])) {
     return TRUE;
   }
 
@@ -1086,7 +1087,13 @@ function gradebookapi_is_teacher($gradebook, $account = NULL) {
  *    an array of student user ids.
  */
 function gradebookapi_get_students($gradebook) {
-  return module_invoke_all('gradebookapi_students', $gradebook);
+  $students = array();
+  $modules = module_implements('gradebookapi_students');
+  foreach ($modules as $module) {
+    $function = $module .'_gradebookapi_students';
+    $students = $function($gradebook, $students);
+  }
+  return $students;
 }
 
 /**
@@ -1100,7 +1107,13 @@ function gradebookapi_get_students($gradebook) {
  *    an array of teacher user ids.
  */
 function gradebookapi_get_teachers($gradebook) {
-  return module_invoke_all('gradebookapi_teachers', $gradebook);
+  $teachers = array();
+  $modules = module_implements('gradebookapi_teachers');
+  foreach ($modules as $module) {
+    $function = $module .'_gradebookapi_teachers';
+    $teachers = $function($gradebook, $teachers);
+  }
+  return $teachers;
 }
 
 /**

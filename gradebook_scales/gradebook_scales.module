@@ -22,7 +22,7 @@ function gradebook_scales_theme() {
 function gradebook_scales_menu() {
   $items = array();
   $items['gradebook/%gradebookapi_gradebook/scales'] = array(
-    'title'            => 'List scales',
+    'title'            => 'Scales',
     'page callback'    => 'gradebook_scales_list_page',
     'page arguments'   => array(1),
     'access callback'  => 'gradebookapi_is_teacher',
@@ -38,7 +38,7 @@ function gradebook_scales_menu() {
     'access callback'  => 'gradebookapi_is_teacher',
     'access arguments' => array(1),
     'weight'           => 6,
-    'type'             => MENU_LOCAL_TASK,
+    'type'             => MENU_CALLBACK,
   );
 
   $items['gradebook/%gradebookapi_gradebook/scaleedit/%'] = array(
@@ -52,7 +52,7 @@ function gradebook_scales_menu() {
   );
 
   $items['gradebook/%gradebookapi_gradebook/catweights'] = array(
-    'title'              => 'Weight categories',
+    'title'              => 'Weighting',
     'page callback'      => 'drupal_get_form',
     'page arguments'     => array('gradebook_scales_weight_form', 1),
     'access callback'    => 'gradebookapi_is_teacher',
@@ -88,6 +88,8 @@ function gradebook_scales_list_page($gradebook) {
     if (empty($rows)) {
       $rows[] = array(array('data' => t('No scales available.'), 'colspan' => '2'));
     }
+
+    $rows[] = array(array('data' => l('Add new scale', 'gradebook/'. $gradebook->tid .'/scaleadd'), 'colspan' => '2'));
 
     $GLOBALS['pager_page_array'][] = $start_from;  // FIXME
     $GLOBALS['pager_total'][] = intval($total_entries / $page_increment) + 1; // FIXME
@@ -159,7 +161,7 @@ function gradebook_scales_form(&$form_state, $gid, $sid = NULL, $scalename = '',
 }
 
 function gradebook_scales_form_cancel($form, &$form_state) {
-  $form_state['redirect'] = array('gradebook/'. $form['#gid']);
+  $form_state['redirect'] = array('gradebook/'. $form['#gid'] .'/scales');
 }
 
 function gradebook_scales_form_submit($form, &$form_state) {
@@ -172,7 +174,7 @@ function gradebook_scales_form_submit($form, &$form_state) {
   foreach ($copygids as $gid) {
     gradebook_scales_save_scale($gid, NULL, $form_state['values']['scalename'], $form_state['values']['entry']);
   }
-  $form_state['redirect'] = array('gradebook/'. $form['#gid']);
+  $form_state['redirect'] = array('gradebook/'. $form['#gid'] .'/scales');
 }
 
 /**

@@ -35,6 +35,8 @@ function gradebook_category_page($gradebook) {
     $rows[] = array(array('data' => t('No categories available.'), 'colspan' => '2'));
   }
 
+  $rows[] = array(array('data' => l('Add new cateogry', 'gradebook/'. $gradebook->tid .'/catadd'), 'colspan' => '2'));
+
   $GLOBALS['pager_page_array'][] = $start_from;  // FIXME
   $GLOBALS['pager_total'][] = intval($total_entries / $page_increment) + 1; // FIXME
 
@@ -113,6 +115,7 @@ function gradebook_category_form($form_state, $gradebook, $edit = array()) {
   if (isset($category_tid)) {
     $form['delete'] = array('#type' => 'submit', '#value' => t('Delete'));
   }
+  $form['cancel' ] = array('#type' => 'submit', '#value' => t('Cancel'), '#submit' => array('gradebook_category_form_cancel'));
   $form['vid'] = array('#type' => 'hidden', '#value' => gradebookapi_get_vid());
   $form['parent_old'] = array('#type' => 'hidden', '#value' => isset($parent->tid) ? $parent->tid : NULL);
   $form['gid'] = array('#type' => 'hidden', '#value' => $gradebook->tid);
@@ -139,6 +142,9 @@ function gradebook_category_form_submit($form, &$form_state) {
 
 }
 
+function gradebook_category_form_cancel($form, &$form_state) {
+  $form_state['redirect'] = 'gradebook/'. $form_state['values']['gid'] .'/catlist';
+}
 /**
  * Form builder for the category delete form.
  *

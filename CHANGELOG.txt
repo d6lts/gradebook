@@ -1,11 +1,24 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-04-01
+----------------------
+* by MGN: Added link bar on top of gradebook page. Submodules can add links to this bar by implementing
+  hook_gradebook_grade_page_links(). This can be used in place of adding a MENU_LOCAL_TASK. The link bar
+  can be styled by css.
+* by MGN: Changed some MENU_LOCAL_TASKS to linked MENU_CALLBACKS to avoid clutter.
+* by MGN: place all submodules in subdirectories for better organization.
+* by MGN: Change to API functions gradebookapi_get_students() and gradebookapi_get_teachers(). Rather 
+  than just returning an array of user ids, these functions now return an array with keys 'uid', 
+  containing an array of user ids, and 'name', containing an array of names. This change will also allow
+  for future expansion to other array elements containing user data, as needed. Changed all dependent
+  modules to work with these modified functions.
+#418020 by manolopm and MGN: Provide themeable functions for student and teacher gradebook pages. Also added
+  a themable function for gradebook export page.
+
 Gradebook 6.x.2.x-dev, 2009-03-19
 ----------------------
 #404718 by MGN: File attachments to assignment nodes doesn't work. Fixed this bug by replacing array_merge 
 with array summation in hook_form_alter for attachment nodes.
-#407810 by MGN: Removed calls to node_prepare in gradebookapi and gradebook_responses.
-* by MGN: Renamed gradebook_responses_nodeapi helper functions to avoid confusion with hook functions.
 
 Gradebook 6.x.2.x-dev, 2009-03-07
 ----------------------

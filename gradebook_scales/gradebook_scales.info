@@ -1,9 +1,10 @@
 ; $Id$
-name = Gradebook Responses
-description = "Provides student responses for gradebook assignments."
+name = Gradebook Scales and Weights
+description = "Provides assignment scales and gradebook category weights."
 package = Gradebook
 dependencies[] = taxonomy
 dependencies[] = gradebookapi
 dependencies[] = gradebook
 core = 6.x
+
 

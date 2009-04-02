@@ -16,6 +16,31 @@
 }
 
 /**
+ *  Style the links above the gradebook grade page.
+ *  Each link is an item in an unordered list.
+ */
+
+#gradebook-grade-page-links {
+  background-color: #c0c0c0;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  padding-left: 10px;
+  margin-bottom: 10px;
+  font-size: 100%;
+  list-style-type: circle;
+}
+
+#gradebook-grade-page-links ul {
+  margin: 0;
+  padding: 0;
+}
+
+#gradebook-grade-page-links li {
+  display: inline;
+  padding: 0;
+}
+
+/**
  *  Rules to format the gradebook table 
  */
 

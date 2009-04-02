@@ -51,7 +51,7 @@ function gradebook_grade_assignment_page($gradebook, $nid) {  // only accessed b
     $grades = array();
     $students = array();
     $students = gradebookapi_get_students($gradebook);
-    foreach ($students as $uid) {
+    foreach ($students['uid'] as $uid) {
       $grade = gradebookapi_get_grade($uid, $nid);  //now its safe to get $grade
       $grades[$uid] = (array)$grade;
     }
@@ -82,19 +82,24 @@ function gradebook_grade_student_page($gradebook, $uid) {  // access is limited 
 
 function gradebook_grade_form($form_state, $gradebook, $grades) {
   global $user;
-
+  
   $teacher = gradebookapi_is_teacher($gradebook);
+  $students = gradebookapi_get_students($gradebook);
+  $suid = array_flip($students['uid']); // this is needed because keys of $students is lost in module_invoke_all call
 
   $form = array('#theme' => 'gradebook_grade_form');
   $form['grade'] = array('#tree' => TRUE);
   $form['#grades'] = $grades;  // make available for hook_form_alter
   foreach ($grades as $id => $grade) {
-    $account = user_load(array('uid' => $grade['uid']));
+//    $account = user_load(array('uid' => $grade['uid']));
+    $uid = $grade['uid'];
+    $display_name = $students['name'][$suid[$uid]];  // this is needed because module_invoke_all looses the keys
+
     $node = node_load($grade['nid']);
     $form['grade'][$id]['#node'] = $node;  // make available for hook_form_alter
-    $form['grade'][$id]['uid'] = array('#type' => 'value', '#value' => $account->uid);  // must be '#type' => value
+    $form['grade'][$id]['uid'] = array('#type' => 'value', '#value' => $uid);  // must be '#type' => value
     $form['grade'][$id]['nid'] = array('#type' => 'value', '#value' => $node->nid);     // must be '#type' => value
-    $form['grade'][$id]['user'] = array('#value' => $account->name);
+    $form['grade'][$id]['user'] = array('#value' => $display_name);
     $form['grade'][$id]['node'] = array('#value' => $node->title);
     $form['grade'][$id]['#possible'] = $node->possible;
     $percentage = ($grade['earned'] == '') ? NULL : ($node->possible != 0) ? 100.0*$grade['earned']/$node->possible : 0;
