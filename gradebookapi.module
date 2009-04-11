@@ -802,6 +802,8 @@ function gradebookapi_assignment_form_elements($node) {
     '#type' => 'fieldset',
     '#title' => t('Assignment Settings'),
     '#tree' => FALSE,
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
     '#weight' => 0,
     '#validate' => array('gradebookapi_assignment_validate' => array()),
   );
@@ -813,16 +815,6 @@ function gradebookapi_assignment_form_elements($node) {
     '#maxlength' => 10,
     '#required' => TRUE,
   );
-
-  $form['gradebookapi']['possible'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Possible'),
-    '#default_value' => ($node->possible ? $node->possible : '0'),
-    '#size' => 10,
-    '#maxlength' => 10,
-    '#required' => TRUE,
-  );
-
   if ($node->due_date == NULL) {
     $node->due_date = strtotime(variable_get('gradebookapi_assignments_interval', '+1 month'));
   }
@@ -831,13 +823,6 @@ function gradebookapi_assignment_form_elements($node) {
     $node->publish_date = time();
   }
 
-  $form['gradebookapi']['dates'] = array(
-    '#type' => 'fieldset',
-    '#collapsible' => FALSE,
-    '#title' => t('Assignment dates'),
-    '#weight' => -8,
-  );
-
   $datetype = _gradebookapi_usedateapi() ? 'date_popup': 'date';
 
   $default = is_numeric($node->due_date) ?  ( 
@@ -845,7 +830,7 @@ function gradebookapi_assignment_form_elements($node) {
               _gradebookapi_unixtime2datepopup($node->due_date) : _gradebookapi_unixtime2drupaldate($node->due_date)) 
              : $node->due_date;
 
-  $form['gradebookapi']['dates']['due_date'] = array(
+  $form['gradebookapi']['due_date'] = array(
     '#prefix' => '<div class="date_widget">',
     '#suffix' => '</div>',
     '#type' => $datetype,
@@ -858,7 +843,7 @@ function gradebookapi_assignment_form_elements($node) {
   );
 
   if ($datetype == 'date') { // include a time field element
-    $form['gradebookapi']['dates']['due_time'] = array(
+    $form['gradebookapi']['due_time'] = array(
       '#type' => 'test_time',
       '#title' => t('Due at'),
       '#default_value' => variable_get('due_time', array('hour' => 12, 'minute' => 0, 'meridiem' => 'pm')),
@@ -869,7 +854,7 @@ function gradebookapi_assignment_form_elements($node) {
              _gradebookapi_unixtime2datepopup($node->publish_date) : _gradebookapi_unixtime2drupaldate($node->publish_date))
              : $node->publish_date;
 
-  $form['gradebookapi']['dates']['publish_date'] = array(
+  $form['gradebookapi']['publish_date'] = array(
     '#prefix' => '<div class="date_widget">',
     '#suffix' => '</div>',    
     '#type' => $datetype,
@@ -881,7 +866,7 @@ function gradebookapi_assignment_form_elements($node) {
     '#date_format' => 'Y-m-d H:i',
   );
   if ($datetype == 'date') { // include a time field element
-    $form['gradebookapi']['dates']['publish_time'] = array(
+    $form['gradebookapi']['publish_time'] = array(
       '#type' => 'test_time',
       '#title' => t('Publish time'),
       '#default_value' => variable_get('publish_time', array('hour' => 12, 'minute' => 0, 'meridiem' => 'pm')),
@@ -970,7 +955,8 @@ function gradebookapi_form_alter(&$form, $form_state, $form_id) {
  * @return NONE
  */
 function gradebookapi_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
-  if (in_array($node->type, (array)gradebookapi_get_assignment_types())) {
+  $types =(array)gradebookapi_get_assignment_types();
+  if (in_array($node->type, $types)) {
     switch ($op) {
       case 'load':
         return gradebookapi_assignment_load($node);

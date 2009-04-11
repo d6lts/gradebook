@@ -24,6 +24,28 @@ function gradebook_responses_user($op, &$edit, &$account, $category = NULL) {
   }
 }
 
+/** 
+ * Implementation of hook_link().
+ */
+function gradebook_responses_link($type, $node = NULL, $teaser = FALSE) {
+  $links = array();
+  $aid = $node->nid;
+  $assignment_types = gradebookapi_get_assignment_types();
+  if (isset($assignment_types[$node->type])) {
+    $response_types = gradebook_responses_allowed_response_types($aid);
+    foreach ($response_types as $type) {
+      $type_name = db_result(db_query("SELECT name FROM {node_type} where type = '%s'", $type));
+      $type_url_str = str_replace('_', '-', $type);  // need this for content types with underscores...
+      $links['response_'. $type] = array(
+        'title' => t("Submit a !name response to this assignment.", array('!name' => $type_name)),
+        'href' => 'node/add/'. $type_url_str,
+        'query' => 'aid='. $aid,
+      );
+    }
+  }
+  return $links;
+}
+
 /**
  *  gradebook_responses_get_response_types
  *  @return 
@@ -31,6 +53,21 @@ function gradebook_responses_user($op, &$edit, &$account, $category = NULL) {
  */
 function gradebook_responses_get_response_types() {
   $types = array_filter((array)variable_get('gradebook_responses_types', array())); //set on gradebookapi admin form
+  return $types;
+}
+
+/**
+ *  retrieve an array of allowed response types for an assignment.
+ *  @param $aid
+ *    the node id for the assignment
+ *
+ */
+function gradebook_responses_allowed_response_types($aid) {
+  $types = array();
+  $result = db_result(db_query('SELECT response_types FROM {gradebookapi_assignment} WHERE nid = %d', $aid));
+  if (isset($result)) {
+    $types = explode(',', $result);
+  }
   return $types;
 }
 
@@ -87,7 +124,9 @@ function _gradebook_responses_load($node) {
  *  @return NONE
  */
 function _gradebook_responses_insert($node) {
-  db_query("INSERT INTO {gradebook_responses} (nid, aid, uid, rstatus) VALUES (%d, %d, %d, %d)", $node->nid, $node->aid, $node->uid, $node->rstatus);
+  if (is_numeric($node->aid)) {
+    db_query("INSERT INTO {gradebook_responses} (nid, aid, uid, rstatus) VALUES (%d, %d, %d, %d)", $node->nid, $node->aid, $node->uid, $node->rstatus);
+  }
 }
 
 /**
@@ -99,12 +138,13 @@ function _gradebook_responses_insert($node) {
  *  @return NONE
  */
 function _gradebook_responses_update(&$node) {
-
-  if (db_result(db_query('SELECT * FROM {gradebook_responses} a WHERE a.nid = %d AND a.uid=%d', $node->nid, $node->uid))) {
-    db_query("UPDATE {gradebook_responses} SET aid = %d, rstatus = %d WHERE nid = %d AND uid =%d", $node->aid, $node->rstatus, $node->nid, $node->uid); 
-  }
-  else { // assignment doesn't exist in gradebook_responses table for this user, so insert it
-    _gradebook_responses_insert($node);
+  if (is_numeric($node->aid)) {
+    if (db_result(db_query('SELECT * FROM {gradebook_responses} a WHERE a.nid = %d AND a.uid=%d', $node->nid, $node->uid))) {
+      db_query("UPDATE {gradebook_responses} SET aid = %d, rstatus = %d WHERE nid = %d AND uid =%d", $node->aid, $node->rstatus, $node->nid, $node->uid); 
+    }
+    else { // assignment doesn't exist in gradebook_responses table for this user, so insert it
+      _gradebook_responses_insert($node);
+    }
   }
 }
 
@@ -184,7 +224,7 @@ function theme_gradebook_responses_status($rstatus) {
 function _gradebook_responses_status_string() {
   static $status_string;
   if (empty($status_string)) {
-    $status_string = array( 0 => t('Not set'), 1 => t('In progress'), 2 => t('Completed'), 3 => t('Graded')
+    $status_string = array( 0 => t('- Not set -'), 1 => t('In progress'), 2 => t('Completed'), 3 => t('Graded')
     );
   }
   return $status_string;
@@ -206,7 +246,7 @@ function gradebook_responses_form_elements($node) {
     global $user;
     //$account = user_load(array('uid' => $user->uid));
     $account = user_load(array('uid' => $node->uid));
-    $options = array();  // get all possible assignments for this user
+    $options = array('none' => t('- None -'));  // get all possible assignments for this user
     $vid = gradebookapi_get_vid();
     $result = db_query('SELECT DISTINCT t.tid FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = %d', $vid);
     while ($tid = db_result($result)) {
@@ -217,13 +257,14 @@ function gradebook_responses_form_elements($node) {
         $assignments = array();
         if ($res) {
           while ($assignment = db_fetch_object($res)) {
-            $assignment = node_load($assignment->nid);
-            // TODO: don't include if a grade already exists for this assignment
-            $result_earned = db_query('SELECT earned FROM {gradebookapi_grade} WHERE uid=%d and nid=%d', $account->uid, $assignment->nid);
-            $earned = db_result($result_earned);
-            if (is_null($earned) || $earned == '' || $locked) { // assignment has not been graded, add to options
-              $options[$assignment->nid] = $assignment->title;
-            } 
+	    $allowed = gradebook_responses_allowed_response_types($assignment->nid);  
+            if (in_array($node->type, $allowed)) {
+              $assignment = node_load($assignment->nid);
+              $earned = db_result(db_query('SELECT earned FROM {gradebookapi_grade} WHERE uid=%d and nid=%d', $account->uid, $assignment->nid));
+              if (is_null($earned) || $earned == '' || $locked) { // assignment has not been graded, add to options
+                $options[$assignment->nid] = $assignment->title;
+              } 
+            }
           }
         }
       }
@@ -238,23 +279,65 @@ function gradebook_responses_form_elements($node) {
       '#weight' => 0,
     );
 
-    $form['gradebook_responses']['aid'] = array(
-      '#type' => 'select',
-      '#title' => t('This is a response to assignment'),
-      '#default_value' => (isset($node->aid) ? $node->aid : NULL),   // verify this
-      '#options' => $options,
-      '#required' => TRUE,
-      '#disabled' => $locked,
-    );
+    if (isset($_GET['aid'])) {
+      $form['gradebook_responses']['aid'] = array('#type' => 'value', '#value' => $_GET['aid']);
+    }
+    else {
+      $form['gradebook_responses']['aid'] = array(
+        '#type' => 'select',
+        '#title' => t('This is a response to assignment'),
+        '#default_value' =>  (isset($node->aid) ? $node->aid : NULL),
+        '#options' => $options,
+        '#required' => TRUE,
+        '#disabled' => $locked,
+      );
+    }
       //cannot select the last (locked) option
     $form['gradebook_responses']['rstatus'] = array(
       '#type' => 'select',
       '#title' => t('Response Status'),
-      '#default_value' => (isset($node->rstatus) ? $node->rstatus : NULL),   // verify this
+      '#default_value' => (isset($node->rstatus) ? $node->rstatus : NULL),  
       '#options' => $status_options,
       '#required' => TRUE,
       '#disabled' => $locked,
     );
+  return $form;
+}
+
+/**
+ *  gradebook_responses_assignment_form_elements().
+ *    Allow teacher to specify the type of response type
+ *    Called via hook_form_alter.
+ *  @param $node
+ *    the assignment node
+ *  @return $form
+ *    additional form array elements for the assignment create form.
+ */
+function gradebook_responses_assignment_form_elements($node) {
+  $form = array();
+  $types = gradebook_responses_get_response_types();
+  $options = array();
+  foreach ($types as $type) {
+    $options[$type] = $type;
+  }
+  $default = array();  // prepare the default values for the select
+  if (isset($node->allowed_response_types)) {
+    foreach($node->allowed_response_types as $type) {
+      $default[$type] = $type;
+    }
+  }
+
+  $form['allowed_response_types'] = array(
+    '#type' => 'select',
+    '#title' => t('Require response type'),
+    '#default_value' => $default,   // verify this
+    '#options' => $options,
+    '#multiple' => TRUE,
+    '#required' => FALSE,
+    '#description' => t('Select one or more content types that students can create to respond to the assignment.'),
+    '#weight' => 10,
+  );
+
   return $form;
 }
 
@@ -282,6 +365,12 @@ function gradebook_responses_form_alter(&$form, $form_state, $form_id) {
     if (in_array($node->type, $types)) {
       $form += gradebook_responses_form_elements($node);
     }
+    $types = gradebookapi_get_assignment_types();
+    if (!empty($types)) {  // are we an assignment type?
+      if (in_array($node->type, $types)) {
+        $form['gradebookapi'] += gradebook_responses_assignment_form_elements($node);
+      } 
+    }
   }
 }
 
@@ -291,7 +380,9 @@ function gradebook_responses_form_alter(&$form, $form_state, $form_id) {
  * @return NONE
  */
 function gradebook_responses_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+
   $types = (array)gradebook_responses_get_response_types();
+
   if (!empty($types) && in_array($node->type, $types)) {
     switch ($op) {
       case 'load':
@@ -308,6 +399,27 @@ function gradebook_responses_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
       case 'view':
         _gradebook_responses_view($node, $a3, $a4);
         break;
+    }
+  } 
+  else {
+    $types = (array)gradebookapi_get_assignment_types();
+    if (in_array($node->type, (array)gradebookapi_get_assignment_types())) {
+      switch ($op) {
+        case 'load':  // retrieve an array of allowed response types for this node
+          $allowed = gradebook_responses_allowed_response_types($node->nid);
+          $additions = array('allowed_response_types' => $allowed);
+          return $additions;
+        case 'insert':
+        case 'update': // will always be called after gradebookapi_nodeapi...
+          $allowed = implode(',', $node->allowed_response_types); //store as an imploded string
+          if ($allowed != '') {
+            db_query("UPDATE {gradebookapi_assignment} SET response_types = '%s' WHERE nid = %d", $allowed, $node->nid);
+          }
+          else {
+            db_query("UPDATE {gradebookapi_assignment} SET response_types = NULL WHERE nid = %d", $node->nid);
+          }
+          break;
+      }
     }
   }
 }
@@ -374,4 +486,5 @@ function gradebook_responses_gradebook_theme_add_content($position, &$form, $id,
       return $response_output;
   }
 }
+
 

@@ -1,5 +1,10 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-04-04
+----------------------
+#419316 by manolpm and MGN: Added new feature to provide optional response links on gradebook assignment nodes.
+* by MGN: cleaned up assignment form elements added by all modules to be listed in one fieldset instead of several.
+
 Gradebook 6.x.2.x-dev, 2009-04-01
 ----------------------
 * by MGN: Added link bar on top of gradebook page. Submodules can add links to this bar by implementing

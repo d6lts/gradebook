@@ -9,7 +9,7 @@
  * Implementation of hook_perm().
  */
 function gradebook_attachments_perm() {
-  return array( 'attach files to gradebook');
+  return array('attach files to gradebook');
 }
 
 /**
@@ -166,7 +166,7 @@ function gradebook_attachments_form_alter(&$form, $form_state, $form_id) {
     $node = $form['#node'];
     $types = gradebookapi_get_assignment_types();
     if (in_array($node->type, $types)) {
-      $form += gradebook_attachments_form_elements($node);
+      $form['gradebookapi'] += gradebook_attachments_form_elements($node);
     }
   }
 }
@@ -399,19 +399,13 @@ function gradebook_attachments_form_elements($node) {
                    2 => t('Disable student attachments after assignment has been graded'),
                    3 => t('Do not allow student attachments'),
                    4 => t('Use gradebook settings default'), );
-  $form['gradebook_attachments'] = array(
-      '#type' => 'fieldset',
-      '#title' => t('Assignment Attachment Settings'),
-      '#tree' => FALSE,
-      '#weight' => 0,
-    );
-
-    $form['gradebook_attachments']['attach_status'] = array(
-      '#type' => 'select',
-      '#title' => t('Restrict student attachments'),
-      '#default_value' => (isset($node->attach_status) ? $node->attach_status : 4),
-      '#options' => $options,
-      '#required' => TRUE,
-    );
+  $form['attach_status'] = array(
+    '#type' => 'select',
+    '#title' => t('Restrict student attachments'),
+    '#default_value' => (isset($node->attach_status) ? $node->attach_status : 4),
+    '#options' => $options,
+    '#required' => TRUE,
+    '#weight' => 15,
+  );
   return $form;
 }

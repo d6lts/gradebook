@@ -277,7 +277,6 @@ function gradebook_scales_scale_delete($sid) {
   db_query('DELETE FROM {gradebook_scales} WHERE sid = %d', $sid);
 }
 
-
 /**
  *  gradebookapi_assigment_form_elements().
  *    Prepare extra assignment fields for the node create forms.
@@ -303,6 +302,7 @@ function gradebook_scales_assignment_form_elements($node) {
   }
   $gid = isset($gradebook) ? $gradebook->tid : NULL;
   $scales = gradebook_scales_get_scales($gid);
+  $options  = array( 'none' => t('- No Scale -'));
   foreach ($scales as $scale) {
     if ($gid) { 
       $text = $scale->scalename;      
@@ -313,19 +313,10 @@ function gradebook_scales_assignment_form_elements($node) {
     }
     $options[$scale->sid] = $text;
   }
-  $options['none'] = t('No Scale');
 
-  $form['gradebook_scale'] = array(
-    '#title' => t('Assignment Grading Scale'),
-    '#type' => 'fieldset',
-    '#tree' => FALSE,
-    '#weight' => 0,
-    '#validate' => array('gradebook_scales_assignment_validate' => array()),
-  );
-
-  $form['gradebook_scale']['sid'] = array(
+  $form['sid'] = array(
     '#type' => 'select',
-    '#title' => t('Select Scale'),
+    '#title' => t('Grading Scale'),
     '#options' => $options,
     '#default_value' => isset($node->sid) ? $node->sid : 'none',
     '#required' => TRUE,
@@ -333,7 +324,7 @@ function gradebook_scales_assignment_form_elements($node) {
   
   $form['#submit'][] = 'gradebook_scales_assignment_submit';
   if (isset($oldsid)) {
-    $form['gradebook_scale']['oldsid'] = array('#type' => 'hidden', '#value' => $oldsid);
+    $form['oldsid'] = array('#type' => 'hidden', '#value' => $oldsid);
   }
 
   return $form;
@@ -376,7 +367,7 @@ function gradebook_scales_form_alter(&$form, $form_state, $form_id) {
     $types = gradebookapi_get_assignment_types();
     if (!empty($types)) { // are we an assignment type?
       if (in_array($node->type, $types)) {
-        $form += gradebook_scales_assignment_form_elements($node);
+        $form['gradebookapi'] += gradebook_scales_assignment_form_elements($node);
       } 
     }
   }
