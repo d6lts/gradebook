@@ -27,6 +27,46 @@ function gradebook_theme() {
   );
 }
 
+/** 
+ * Implementation of hook_link().
+ */
+function gradebook_link($type, $node = NULL, $teaser = FALSE) {
+  $links = array();
+  global $user;
+  $uid = $user->uid;
+  $nid = $node->nid;
+  $assignment_types = gradebookapi_get_assignment_types();
+  if (isset($assignment_types[$node->type])) {
+    $terms = gradebookapi_assignment_terms($node);
+    $gids = array();
+    foreach ($terms as $term) {
+      $gradebook = gradebookapi_get_tid_gradebook($term->tid);
+      $gids[] = $gradebook->tid;
+    }
+    if (!empty($gids)) {
+      // Allow assignment to be in multiple gradebooks. Create links for each gradebook.
+      foreach (array_unique($gids) as $gid)  {
+        $gradebook = gradebookapi_get_tid_gradebook($gid);
+        $teacher = gradebookapi_is_teacher($gradebook);
+        $student = gradebookapi_is_student($gradebook);
+        if ($teacher || $student) {
+          $href = 'gradebook/'. $gradebook->tid;
+          $href .= ($teacher) ? '/grade-assignment/' :  '/grade/'. $uid .'/';
+          $href .= $nid;
+          $attributes = ($teacher) ? t("Assign !gradebook_name grade for this assignment.", array('!gradebook_name' => $gradebook->name)) : t("View !gradebook_name grade for this assignment.", array('!gradebook_name' => $gradebook->name));
+          $title = ($teacher) ? t("Assign Grade") : t("View Grade");
+          $links['gradebook_'. $gradebook->name] = array(
+            'title' => $title,
+            'href' => $href,
+            'attributes' => array('title' => $attributes),
+          );
+        }
+      }
+    }
+  }
+  return $links;
+}
+
 /**
  * hook_term_path from taxonomy module
  *
@@ -54,7 +94,6 @@ function gradebook_menu() {
     'type'             => MENU_SUGGESTED_ITEM,
   );
 
-  // admin menu
   $items['admin/gradebook/gradebook'] = array(
     'title'            => 'Gradebooks',
     'description'      => 'Control gradebooks and change gradebook settings.',
@@ -99,14 +138,14 @@ function gradebook_menu() {
     'weight'           => 5,
     'type'             => MENU_LOCAL_TASK,
   );
-// TODO: Why doesn't title callback work?
+  // TODO: Why doesn't title callback work?
 
   $items['gradebook/%gradebookapi_gradebook'] = array(
     'title'              => 'Gradebook Name',
     'title callback'     => 'gradebook_get_gradebook_name',
     'title arguments'    => array(1),
     'page callback'      => 'gradebook_gradebook_page',
-    'page arguments'     => array(1, 2),              // optional path element specifies user id
+    'page arguments'     => array(1, 2),
     'access callback'    => 'user_access',
     'access arguments'   => array('access gradebook'),
     'type'               => MENU_CALLBACK,
@@ -120,7 +159,7 @@ function gradebook_menu() {
     'weight'             => -10,
   );
 
-// Have a gradebook settings for control of local gradebook display
+  // Create a gradebook settings for control of local gradebook display.
   $items['gradebook/%gradebookapi_gradebook/settings'] = array(
     'title' => 'Settings',
     'page callback' => 'drupal_get_form',
@@ -175,7 +214,7 @@ function gradebook_menu() {
     'type' => MENU_LOCAL_TASK,
   );
 
-  $items['gradebook/%gradebookapi_gradebook/grade/%/%'] = array(  // 3 is uid, 4 is nid
+  $items['gradebook/%gradebookapi_gradebook/grade/%/%'] = array(
     'title'              => 'edit grade',
     'title callback'     => 'gradebook_edit_or_summary',
     'title arguments'    => array(1),
@@ -188,7 +227,6 @@ function gradebook_menu() {
     'file'               => 'gradebook.pages.inc',
   );
 
-// Entering grade by assignment, rather than individually
   $items['gradebook/%gradebookapi_gradebook/grade-assignment/%'] = array(
     'title'              => 'Enter Assignment Grades',
     'page callback'      => 'gradebook_grade_assignment_page',
@@ -200,7 +238,6 @@ function gradebook_menu() {
     'file'               => 'gradebook.pages.inc',
   );
 
-// Entering all grades for user, rather than individually
   $items['gradebook/%gradebookapi_gradebook/edit-all/%'] = array(
     'title'              => 'Enter Assignment Grades',
     'page callback'      => 'gradebook_grade_student_page',
@@ -220,7 +257,7 @@ function gradebook_menu() {
  *
  */
 function gradebook_init() {
-  // Add the CSS for this module
+  // Add the CSS for this module.
   drupal_add_css(drupal_get_path('module', 'gradebook') .'/gradebook.css');
 }
 
@@ -364,7 +401,7 @@ function gradebook_list_page() {
   $result = pager_query($sql, variable_get('gradebook_gradebooks_per_page', 25));
   $lastpath = '';
   while ($term = db_fetch_object($result)) {
-    //Filter the gradebook list to show only gradebooks for which the user is a student or teacher
+    //Filter the gradebook list to show only gradebooks for which the user is a student or teacher.
     $gradebook = gradebookapi_gradebook_load($term->tid);
     if (gradebookapi_is_student_or_teacher($gradebook)) {
       $rows[] = array('name' => l($term->name, $lastpath = 'gradebook/'. $term->tid));
@@ -471,28 +508,29 @@ function gradebook_gradebook_page($gradebook, $uid = NULL, $export = FALSE) {
   $sort = isset($_GET['sort']) ? (($_GET['sort'] == 'desc') ? 'DESC' : 'ASC') : (isset($default_sort[$gradebook->tid]) ? $default_sort[$gradebook->tid] : 'ASC');
 
   $teacher = gradebookapi_is_teacher($gradebook);  
+  // Make sure user has permission to be here.
   if (!$teacher && !empty($uid)) {
-    if ($uid != $user->uid) {  // make sure we have permission to be here
+    if ($uid != $user->uid) {  
       drupal_access_denied();
       return;
     }
   }
 
-  // if not a teacher set uid to own
+  // If user is not a teacher, set uid to own.
   if (!$teacher) {
     $uid = $user->uid;
   }
 
-// MN: Problems here with $tids not being defined - breaks E_ALL compliance
-//     for now, set it equal to an empty array.
+  // MN: Problems here with $tids not being defined - breaks E_ALL compliance
+  //     for now, set it equal to an empty array.
   $tids = array();
 
-// Note: don't use pager on export
+  // Note: don't use pager on export
   $assignments = gradebook_get_sorted_assignments($gradebook, $tids, !$export, $order, $sort);
   $students = gradebookapi_get_students($gradebook);
 
   if (!empty($uid)) {
-    $key = array_search($uid, $students['uid']);  // remove all uid, name except for 
+    $key = array_search($uid, $students['uid']);
     if ($key) {
       $students = array('uid' => $students['uid'][$key], 'name' => $students['name'][$key]);
       $result = db_query("SELECT uid FROM {users} WHERE status <> 0 AND uid=%d", $uid);
@@ -581,10 +619,10 @@ function theme_gradebook_student_page($gradebook, $assignments, $student, $stude
     $display_name = $student['name'];
     $row[] = check_plain($display_name);
     $grade = gradebookapi_get_term_grade($uid, $gradebook->tid);
-    $row[] = theme('gradebook_term_grade',$gradebook, $grade); //theme_gradebook_term_grade($gradebook, $grade);
+    $row[] = theme('gradebook_term_grade',$gradebook, $grade);
     foreach ($assignments as $assignment) {
       $grade = $grades[$assignment->nid];
-      $row[] = theme('gradebook_assignment_grade', $gradebook, $grade); //theme_gradebook_assignment_grade($gradebook, $grade);
+      $row[] = theme('gradebook_assignment_grade', $gradebook, $grade);
     }
     $rows[] = $row;
   }
@@ -592,7 +630,8 @@ function theme_gradebook_student_page($gradebook, $assignments, $student, $stude
   $output = '<div id="gradebook-container">';
   $output .= theme('gradebook_table', $headers, $rows, array('class' => 'gradebook'));
   $output .= '</div>';
-  $output .= theme('pager', NULL, variable_get('gradebook_grades_per_page', 10), 0);  // configure at admin screen!
+  // This can be configured at the gradebook admin screen.
+  $output .= theme('pager', NULL, variable_get('gradebook_grades_per_page', 10), 0);
 
   return $output;
 }
@@ -601,7 +640,8 @@ function theme_gradebook_student_page($gradebook, $assignments, $student, $stude
  *  Theme the gradebook page for teachers
  */
 function theme_gradebook_teacher_page($gradebook, $assignments, $students, $student_grades) {
-  $suid = array_flip($students['uid']); // this is needed because keys of $students is lost in module_invoke_all call
+  // This is needed because keys of $students is lost in module_invoke_all call.
+  $suid = array_flip($students['uid']); 
   $weights = gradebookapi_get_weights($gradebook->tid);
   $showweight = isset($weights['method']) && ($weights['method'] > 0);
   $sort = (isset($_GET['sort']) && ($_GET['sort'] == 'asc')) ? 'desc' : 'asc';
@@ -649,19 +689,21 @@ function theme_gradebook_teacher_page($gradebook, $assignments, $students, $stud
     $headers['title'][]    = array('data' => l($assignment->title, 'node/'. $assignment->nid), 'class' => 'title');
     $headers['edit-all'][] = array('data' => l('[edit all]', 'gradebook/'. $gradebook->tid .'/grade-assignment/'. $assignment->nid), 'class' => 'edit-all');
   }
-
-  $sum = array();  // total assignment score across all graded students
-  $sum_possible = array(); // total possible score across all graded students
+  // Total assignment score across all graded students.
+  $sum = array();
+  // Total possible score across all graded students.
+  $sum_possible = array();
   $rows = array();  
   foreach ($student_grades as $uid => $grades) {
     $row = array();
-    $display_name = $students['name'][$suid[$uid]];  // this is needed because module_invoke_all looses the keys
+    // This is needed because module_invoke_all looses the keys.
+    $display_name = $students['name'][$suid[$uid]];
     $row[] = l($display_name, 'gradebook/'. $gradebook->tid .'/edit-all/'. $uid);
     $grade = gradebookapi_get_term_grade($uid, $gradebook->tid);
-    $row[] = theme('gradebook_term_grade', $gradebook, $grade); //theme_gradebook_term_grade($gradebook, $grade);
+    $row[] = theme('gradebook_term_grade', $gradebook, $grade);
     foreach ($assignments as $assignment) {
       $grade = $grades[$assignment->nid];
-      $row[] = theme('gradebook_assignment_grade',$gradebook, $grade); // was theme_gradebook_assignment_grade...
+      $row[] = theme('gradebook_assignment_grade',$gradebook, $grade);
       if ((!isset($grade->exempt) || $grade->exempt == FALSE) && isset($grade->earned)) {
         $sum[$assignment->nid] += $grade->earned;
         $sum_possible[$assignment->nid] += $grade->possible;
@@ -669,7 +711,7 @@ function theme_gradebook_teacher_page($gradebook, $assignments, $students, $stud
     }
     $rows[] = $row;
   }
-  // prepare averages row
+  // Prepare the averages row.
   foreach ($assignments as $assignment) {
     $sp = $sum_possible[$assignment->nid];
     $avgfmt = ($sp > 0) ? sprintf('%.1f', ($sum[$assignment->nid]/$sp)*100) : NULL;
@@ -684,7 +726,8 @@ function theme_gradebook_teacher_page($gradebook, $assignments, $students, $stud
   $output .= '</li></ul></div>';
   $output .= theme('gradebook_table', $headers, $rows, array('class' => 'gradebook'));
   $output .= '</div>';
-  $output .= theme('pager', NULL, variable_get('gradebook_grades_per_page', 10), 0);  // configure at admin screen!
+  // This can be configured at the gradebook admin screen.
+  $output .= theme('pager', NULL, variable_get('gradebook_grades_per_page', 10), 0);
 
   return $output;
 }
@@ -693,7 +736,8 @@ function theme_gradebook_teacher_page($gradebook, $assignments, $students, $stud
  *  Theme the gradebook page for export
  */
 function theme_gradebook_export_page($gradebook, $assignments, $students, $student_grades) {
-  $suid = array_flip($students['uid']); // this is needed because keys of $students is lost in module_invoke_all call
+  // This is needed because keys of $students is lost in module_invoke_all call.
+  $suid = array_flip($students['uid']);
   $weights = gradebookapi_get_weights($gradebook->tid);
   $showweight = isset($weights['method']) && ($weights['method'] > 0);
   $sort = (isset($_GET['sort']) && ($_GET['sort'] == 'asc')) ? 'desc' : 'asc';
@@ -735,19 +779,21 @@ function theme_gradebook_export_page($gradebook, $assignments, $students, $stude
     $headers['due'][]      = format_date($assignment->due_date, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y'));
     $headers['title'][]    = $assignment->title;
   }
-
-  $sum = array();  // total assignment score across all graded students
-  $sum_possible = array(); // total possible score across all graded students
+  // Total assignment score across all graded students.
+  $sum = array();
+  // Total possible score across all graded students.
+  $sum_possible = array();
   $rows = array();  
   foreach ($student_grades as $uid => $grades) {
     $row = array();
-    $display_name = $students['name'][$suid[$uid]];  // this is needed because module_invoke_all looses the keys
+    // This is needed because module_invoke_all loses the keys.
+    $display_name = $students['name'][$suid[$uid]];
     $row[] = $display_name;
     $grade = gradebookapi_get_term_grade($uid, $gradebook->tid);
-    $row[] = theme('gradebook_term_grade', $gradebook, $grade, TRUE);//theme_gradebook_term_grade($gradebook, $grade, TRUE);
+    $row[] = theme('gradebook_term_grade', $gradebook, $grade, TRUE);
     foreach ($assignments as $assignment) {
       $grade = $grades[$assignment->nid];
-      $row[] = theme('gradebook_assignment_grade', $gradebook, $grade, TRUE);  // was...
+      $row[] = theme('gradebook_assignment_grade', $gradebook, $grade, TRUE);
       if ((!isset($grade->exempt) || $grade->exempt == FALSE) && isset($grade->earned)) {
         $sum[$assignment->nid] += $grade->earned;
         $sum_possible[$assignment->nid] += $grade->possible;
@@ -755,7 +801,7 @@ function theme_gradebook_export_page($gradebook, $assignments, $students, $stude
     }
     $rows[] = $row;
   }
-  // prepare averages row
+  // Prepare the averages row.
   foreach ($assignments as $assignment) {
     $sp = $sum_possible[$assignment->nid];
     $avgfmt = ($sp > 0) ? sprintf('%.1f', ($sum[$assignment->nid]/$sp)*100) : NULL;
@@ -828,7 +874,7 @@ function theme_gradebook_table($headers, $rows, $attributes = array(), $caption 
     $output .= '<caption>'. $caption ."</caption>\n";
   }
 
-  // Format the table header:
+  // Format the table header.
   if (count($headers)) {
     $output .= ' <thead>';
     foreach ($headers as $header) {
@@ -843,13 +889,13 @@ function theme_gradebook_table($headers, $rows, $attributes = array(), $caption 
     $output .= " </thead>\n";
   }
 
-  // Format the table rows:
+  // Format the table rows.
   $output .= "<tbody>\n";
   if (count($rows)) {
     foreach ($rows as $number => $row) {
       $attributes = array();
 
-      // Check if we're dealing with a simple or complex row
+      // Check if we're dealing with a simple or complex row.
       if (isset($row['data'])) {
         foreach ($row as $key => $value) {
           if ($key == 'data') {
@@ -864,7 +910,7 @@ function theme_gradebook_table($headers, $rows, $attributes = array(), $caption 
         $cells = $row;
       }
 
-      // Add odd/even class
+      // Add odd/even class.
       $class = ($number % 2 == 1) ? 'even': 'odd';
       if (isset($attributes['class'])) {
         $attributes['class'] .= ' '. $class;
@@ -873,7 +919,7 @@ function theme_gradebook_table($headers, $rows, $attributes = array(), $caption 
         $attributes['class'] = $class;
       }
 
-      // Build row
+      // Build the row.
       $output .= ' <tr'. drupal_attributes($attributes) .'>';
       $i = 0;
       foreach ($cells as $cell) {
@@ -929,9 +975,10 @@ function _gradebook_block_view($delta) {
   switch ($delta) {
     case 0:
       $block['subject'] =  t('Current Assignments');
-      // get all assignments for user and display in a block
+      // Get all assignments for user and display in a block.
       $now = time();
-      $start = '<ul>';  // TODO: add css classes
+      // TODO: add css classes
+      $start = '<ul>';
       $stop  = '</ul>';
       $vid = gradebookapi_get_vid();
       $result = db_query('SELECT DISTINCT t.tid FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = %d', $vid);
@@ -939,7 +986,7 @@ function _gradebook_block_view($delta) {
         $gradebook = gradebookapi_gradebook_load($tid);
         if (gradebookapi_is_student_or_teacher($gradebook)) {
           $header = t('%gradebook_name:', array('%gradebook_name' => $gradebook->name));
-          // get assignments
+          // Get the assignments.
           $assignments = array();
           $tids = array();
           $assignments = gradebook_get_sorted_assignments($gradebook, $tids, FALSE, 'due', '');
@@ -1025,4 +1072,3 @@ function gradebook_teacher_settings($form_state, $gradebook) {
 
   return system_settings_form($form);
 }
-
