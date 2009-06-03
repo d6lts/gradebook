@@ -25,6 +25,9 @@
  * @endcode
  */
 
+/**
+ * Implementation of hook_views_data().
+ */
 function gradebookapi_views_data()  {
   // Basic table information.
   // ----------------------------------------------------------------
@@ -42,7 +45,7 @@ function gradebookapi_views_data()  {
     ),
   );
 
-  // due_date
+  // Due_date.
   $data['gradebookapi_assignment']['due_date'] = array(
     'title' => t('Due Date'),
     'help' => t('Date on which the Gradebook Assignment is due.'),
@@ -58,7 +61,7 @@ function gradebookapi_views_data()  {
     ),
   );
 
-  // due_date
+  // Publish_date.
   $data['gradebookapi_assignment']['publish_date'] = array(
     'title' => t('Publish Date'),
     'help' => t('Date on which the Gradebook Assignment was published.'),
@@ -74,7 +77,7 @@ function gradebookapi_views_data()  {
     ),
   );
 
-  // possible
+  // Possible.
   $data['gradebookapi_assignment']['possible'] = array(
     'title' => t('Possible'),
     'help' => t('Possible points for assignment.'),
@@ -92,7 +95,7 @@ function gradebookapi_views_data()  {
 
   $data['gradebookapi_grade']['table']['group']  = t('Gradebook Grade');
 
-  // tables + fields that can be used for SQL Joins
+  // Tables + fields that can be used for SQL joins.
   $data['gradebookapi_grade']['table']['join'] = array(
     'node' => array(
       'left_field' => 'nid',
@@ -126,4 +129,22 @@ function gradebookapi_views_data()  {
     ),
   );
   return $data;
+}
+
+/**
+ * Implementation of hook_date_api_fields().
+ */
+function gradebookapi_date_api_fields($field) {
+  if ($field == 'gradebookapi_assignment.publish_date') {
+    return array(
+      'sql_type' => DATE_UNIX, // DATE_ISO or DATE_UNIX or DATE_DATETIME
+      'tz_handling' => 'site', // 'site' or 'none' or 'date' or 'utc'
+    );
+  }
+  if ($field == 'gradebookapi_assignment.due_date') {
+    return array(
+      'sql_type' => DATE_UNIX, // DATE_ISO or DATE_UNIX or DATE_DATETIME
+      'tz_handling' => 'site', // 'site' or 'none' or 'date' or 'utc'
+    );
+  }
 }
