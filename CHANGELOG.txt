@@ -1,5 +1,9 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-10-30
+----------------------
+#615534 by MGN: New feature adds security to grade attachments in gradebook_attachments folder.
+
 Gradebook 6.x.2.x-dev, 2009-04-19
 ----------------------
 * by MGN: some code cleanup to meet drupal coding standards - much more to be done on this.

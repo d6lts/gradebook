@@ -176,6 +176,30 @@ IV. Description of Optional Submodules
        not permit attachments (at all).
     G. NOTE: When the module is uninstalled, all gradebook attachments will be deleted.
     H. NOTE: When a student's account is deleted, all attachments to the student's grades will be deleted.
+    I. SECURITY: To secure the gradebook_attachments subdirectory so that only the admin, teacher, and student
+       have access to the files attached to a student's grade, do the following:
+       i.  Create a .htaccess file in the gradebook_attachments subdirectory that contains the following:
+
+           #
+           # Apache/PHP/Drupal settings:
+           #
+
+           <IfModule mod_rewrite.c>
+             RewriteEngine on
+             RewriteBase /system/files/gradebook_attachments
+             RewriteRule ^(.*)$ $1 [L,R=301]
+           </IfModule>
+      
+       ii.  You may need to adjust the RewriteBase for your website configuration, 
+            for example, by adding a directory before /system/ for a multisite configuration
+            or a configuration where DRUPAL is installed in a subdirectory.
+       iii. Next, assign 'access gradebook attachments folder' permission to any role that should
+            have (restricted) access to the gradebook attachments folder.
+       iv.  Now when a request is made for an attached file from the gradebook_attachments folder,
+            only the user who attached the file, the student whose grade it is attached to, 
+            or the teacher will be granted access (admin always has access).
+       v.   See http://drupal.org/node/540754 and/or http://www.drupalcoder.com/node/406
+            for further information on this technique.
 
 2.  Gradebook Responses can be enabled to assign a custom content type to allow students to respond
     assignments. 

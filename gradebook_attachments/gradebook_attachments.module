@@ -9,7 +9,7 @@
  * Implementation of hook_perm().
  */
 function gradebook_attachments_perm() {
-  return array('attach files to gradebook');
+  return array('attach files to gradebook', 'access gradebook attachments folder');
 }
 
 /**
@@ -29,6 +29,46 @@ function gradebook_attachments_user($op, &$edit, &$account, $category = NULL) {
       }
     }
     watchdog('gradebook_attachments', 'Deleted gradebook files for %name (uid %d) upon deletion of account.', array('%name' => $account->name, '%d' => $account->uid), WATCHDOG_INFO);
+  }
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function gradebook_attachments_menu() {
+  $items = array();
+  $items['system/files/gradebook_attachments'] = array(
+    'access arguments' => array('access gradebook attachments folder'),
+    'page callback' => 'file_download',
+    'page arguments' => array('gradebook_attachments'),
+    'type' =>  MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Implementation of hook_file_download().
+ */
+function gradebook_attachments_file_download($path) {
+  global $user;
+  $filepath = file_create_path($path);
+  $file = db_fetch_object(db_query("SELECT fid, uid FROM {files} WHERE filepath = '%s'", $filepath));
+  $attached = db_fetch_object(db_query('SELECT nid, uid FROM {gradebookapi_files} WHERE fid = %d', $file->fid));
+  // Get gradebook from the nid.
+  $node = node_load($attached->nid);
+  foreach (gradebookapi_assignment_terms($node) as $term) {
+    $gradebook = gradebookapi_get_tid_gradebook($term->tid);
+    $teacher = gradebookapi_is_teacher($gradebook);
+    if ($teacher) break;
+  }
+  // Allow file access only if file belongs to the logged in user, or is attached to the logged in users' grade.
+  // Teachers of the logged in user can also access the file.
+  if (($user->uid == $file->uid) || ($user->uid == $attached->uid) || $teacher) {
+    return array('Content-type: '. file_get_mimetype($path));
+  }
+  else {
+    return -1;
   }
 }
 
