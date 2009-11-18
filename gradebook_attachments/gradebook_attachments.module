@@ -190,21 +190,17 @@ function gradebook_attachments_form_alter(&$form, $form_state, $form_id) {
   if ($form_id == 'gradebook_teacher_settings') {
     // Add options to the local gradebook settings form.
     $gid = $form['#gid'];
-    if (!is_array($form['local']['gradebook_attachment_settings'])) {
-      $form['local']['gradebook_attachment_settings'] = array('#tree' => TRUE, );
-    }
-    $default = variable_get('gradebook_attachment_settings', array());
-    if (!isset($default[$gid])) {
-      $default[$gid] = 0;
-    }
-    $form['local']['gradebook_attachment_settings'][$gid] = array(
+
+    $default = variable_get('gradebook_attachment_settings-'. $gid, 0);
+
+    $form['local']['gradebook_attachment_settings-'. $gid] = array(
       '#title' => t('Restrictions on student attachments'),
       '#type' => 'radios',
       '#options' => array(0 => t('Allow student attachments at all times'),
                           1 => t('Disable student attachments after due date has passed'),
                           2 => t('Disable student attachments after assignment has been graded'),
                           3 => t('Do not allow student attachments'), ),
-      '#default_value' => $default[$gid],
+      '#default_value' => $default,
       '#description' => t('Select default restrictions on student attachments. Restrictions selected for individual assignments will override this default behavior.'),
       '#required' => TRUE,
     );
@@ -456,8 +452,8 @@ function gradebook_attachments_attachment_permitted_user($gradebook, $teacher) {
 function gradebook_attachments_attachment_permitted_node($node, $gid, $teacher = FALSE, $graded = FALSE) {
   // Attachments are permitted unless there are restrictions.
   $permission = TRUE;
-  $gradebook_attach_restrictions = variable_get('gradebook_attachment_settings', array());
-  $attach_restrictions = (is_null($node->attach_status) || $node->attach_status == 4) ? $gradebook_attach_restrictions[$gid] : $node->attach_status;
+  $gradebook_attach_restrictions = variable_get('gradebook_attachment_settings-'. $gid, 0);
+  $attach_restrictions = (is_null($node->attach_status) || $node->attach_status == 4) ? $gradebook_attach_restrictions : $node->attach_status;
   if (!$teacher && isset($attach_restrictions)) {
     switch ($attach_restrictions) {
       case 1:

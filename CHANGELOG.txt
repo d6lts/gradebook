@@ -1,5 +1,9 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2009-11-18
+----------------------
+#616566 by MGN: Fix bug in storing and accessing gradebook options.
+
 Gradebook 6.x.2.x-dev, 2009-10-30
 ----------------------
 #615534 by MGN: New feature adds security to grade attachments in gradebook_attachments folder.
