@@ -591,7 +591,6 @@ function gradebook_gradebook_page($gradebook, $uid = NULL, $export = FALSE) {
   // Note: don't use pager on export
   $assignments = gradebook_get_sorted_assignments($gradebook, $tids, !$export, $order, $sort);
   $students = gradebookapi_get_students($gradebook);
-
   if (!empty($uid)) {
     $key = array_search($uid, $students['uid']);
     if ($key) {
@@ -603,8 +602,9 @@ function gradebook_gradebook_page($gradebook, $uid = NULL, $export = FALSE) {
     }
   }
   else {
-    if ($str_uids = implode(',', $students['uid']))
+    if ($str_uids = implode(',', $students['uid'])) {
       $result = db_query("SELECT uid FROM {users}  WHERE status <> 0 AND uid IN (". $str_uids .") ORDER BY name ASC");
+    }
     else {
       $result = FALSE;
     }
@@ -1055,7 +1055,7 @@ function _gradebook_block_view($delta) {
           $assignments = gradebook_get_sorted_assignments($gradebook, $tids, FALSE, 'due', '');
           $items = '';
           foreach ($assignments as $assignment) {
-            if ($now <= $assignment->due_date) {
+            if ($now <= $assignment->due_date && $now >= $assignment->publish_date) {
               $items .= '<li>'. l($assignment->title, 'node/'. $assignment->nid) .' ('. $assignment->possible .') ';
               $items .= '<br />Due: '. format_date($assignment->due_date, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y')) .'</li>';
             }

@@ -39,7 +39,6 @@ function gradebook_add_page() {
  *  gradebook_edit_page is largely borrowed from the core taxonomy.admin.inc file
  *
  */
-
 function gradebook_edit_page($tid=-1) {
   // TODO: check to make sure gradebook tid is valid
 
@@ -50,7 +49,6 @@ function gradebook_edit_page($tid=-1) {
   $term = taxonomy_get_term($tid);
   return drupal_get_form('gradebook_gradebook_form', (array)$term);
 }
-
 
 function gradebook_gradebook_form($form_state, $edit = array()) {
   $form['name'] = array(
@@ -100,7 +98,8 @@ function gradebook_gradebook_form_submit($form, &$form_state) {
 /**
  * Returns a confirmation page for deleting a gradebook taxonomy term.
  *
- * @param $tid ID of the term to be deleted
+ * @param $tid 
+ *   ID of the term to be deleted.
  */
 function gradebook_confirm_gradebook_delete($form_state, $tid) {
   // TODO: make sure this is a valid gradebook term
@@ -119,7 +118,9 @@ function gradebook_confirm_gradebook_delete($form_state, $tid) {
 }
 
 /**
- * Implementation of forms api _submit call. Deletes a gradebook after confirmation.
+ * Implementation of forms api _submit call.
+ *
+ * Deletes a gradebook after confirmation.
  */
 function gradebook_confirm_gradebook_delete_submit($form, &$form_state) {
   // TODO: delete grades
