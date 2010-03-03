@@ -205,7 +205,7 @@ function gradebook_scales_confirm_scale_delete_submit($form, &$form_state) {
   return;
 }
 
-function theme_gradebook_scales_form(&$form) {
+function theme_gradebook_scales_form($form) {
   $output = '<p>'. t('Provide a brief, informative name for the scale. This will appear on the assignment edit form to choose a scale') .'</p>';
   $output .= drupal_render($form['scalename']);
   $output .= '<p>'. t('<strong>Instructions:</strong> Enter grading scales with one mark in each row. The scale maps a range of grade percentages to a mark, which can be a sequence of up to 5 characters.') .'</p>';
@@ -539,7 +539,7 @@ function gradebook_scales_weight_form_cancel($form, &$form_state) {
   $form_state['redirect'] = 'gradebook/'. $form['#gid'] .'/catlist';
 }
 
-function theme_gradebook_scales_weight_form(&$form) {
+function theme_gradebook_scales_weight_form($form) {
   $output = drupal_render($form['method']);
   $header = array(t('Category name'), t('Weight (%)'));
   $keys = element_children($form['category']);

@@ -195,7 +195,7 @@ function gradebook_grade_form_submit($form, &$form_state) {
     unset($form_state['values']['return_url']);
 }
 
-function theme_gradebook_grade_form(&$form) {
+function theme_gradebook_grade_form($form) {
   global $user;
   $ids = element_children($form['grade']);
   $selectid = count($ids);

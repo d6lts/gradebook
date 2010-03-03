@@ -24,6 +24,7 @@ function gradebook_theme() {
     'gradebook_assignment_grade' => array('arguments' => array('gradebook', 'grade', 'export')),
     'gradebook_term_grade' => array('arguments' => array('gradebook', 'grade', 'export')),
     'gradebook_grade_form' => array('arguments' => array('form_state' => NULL)),
+    'gradebook_grade_summary' => array('arguments' => array('account' => NULL, 'data' => NULL)),
   );
 }
 
@@ -249,6 +250,15 @@ function gradebook_menu() {
     'file'               => 'gradebook.pages.inc',
   );
 
+  $items['user/%user/grades'] = array(
+    'type' => MENU_LOCAL_TASK,
+    'title' => t('Grade Summary'),
+    'page callback' => 'gradebook_page_grade_summary',
+    'page arguments' => array(1),
+    'access callback' => 'gradebook_page_grade_summary_access',
+    'access arguments' => array(1),
+  );
+
   return $items;
 }
 
@@ -458,7 +468,6 @@ function _gradebook_parent_select($root, $tid, $title) {
  *  Get Sorted Assignments
  *
  */
-
 function gradebook_get_sorted_assignments($gradebook, $tids, $pager, $order, $sort) {
 
   switch ($order) {
@@ -486,6 +495,60 @@ function gradebook_get_sorted_assignments($gradebook, $tids, $pager, $order, $so
     }
   }
   return $assignments;
+}
+
+function gradebook_page_grade_summary_access($account) {
+  global $user;
+  // Only display a grade summary tab if the user is a student in some gradebook and
+  // the logged in user is either the owner of the account or a gradebook administrator.
+  $count = db_result(db_query("SELECT COUNT(*) FROM {gradebookapi_cache} WHERE uid=%d", $account->uid));
+  return ($count > 0) && (($account->uid == $user->uid) || user_access('administer gradebook'));
+}
+
+function gradebook_page_grade_summary($account) {
+  // Get overall grades for this user and display in a themeable table.
+  $uid = $account->uid;
+  $vid = gradebookapi_get_vid();
+  $result = db_query('SELECT DISTINCT t.tid FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = %d', $vid);
+  // Gather data for gradebook summary page.
+  $data = array();
+  while ($tid = db_result($result)) {
+    $gradebook = gradebookapi_gradebook_load($tid);
+    if (gradebookapi_is_student($gradebook, $account)) {
+      $grade = gradebookapi_get_term_grade($uid, $gradebook->tid);
+      $data[$tid] = array('gradebook' => $gradebook, 'grade' => $grade);
+    }
+  }
+  return theme('gradebook_grade_summary', $account, $data);
+}
+
+function theme_gradebook_grade_summary($account, $data) {
+
+  // If no data is available, print a helpful message!
+  if (empty($data)) {
+    $output = t('No grades are available for @user', array('@user' => $account->name));
+    return $output;
+  }
+
+  $headers = array(t('Course'), t('Grade'));
+  $rows = array();
+  foreach ($data as $tid => $entry) {
+    $row = array();
+    $gradebook = $entry['gradebook'];
+    $grade = $entry['grade'];
+    $row[] = l($gradebook->name, 'gradebook/'. $tid);
+    // Get the term grades.
+    $row[] = theme('gradebook_term_grade', $gradebook, $grade, TRUE);
+    $rows[] = $row;
+  }
+  return theme('table', $headers, $rows);
+}
+
+/**
+ *  Implementation of hook_preprocess_user_profile().
+ */
+function gradebook_preprocess_user_profile(&$variables) {
+  $variables['grade_summary'] = gradebook_page_grade_summary($variables['account']);
 }
 
 /**

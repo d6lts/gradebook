@@ -1,5 +1,10 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2010-03-02
+----------------------
+#706912 by Berdir: PHP 5.3 compatibility fixes for theme functions.
+#613352 by MGN: Gradebook & user profile aggregates.
+
 Gradebook 6.x.2.x-dev, 2009-11-18
 ----------------------
 #616566 by MGN: Fix bug in storing and accessing gradebook options.
