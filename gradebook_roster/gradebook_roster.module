@@ -189,7 +189,7 @@ function gradebook_roster_get_roster($gradebook) {
           'gid' => $gradebook->tid,
           'uid' => $uid,
           'name' => $members['name'][$key],
-          'display_name' =>  isset($display_name) ? $display_name : $member['name'],
+          'display_name' =>  isset($display_name) ? $display_name : $members['name'][$key],
           'grid' => $grid,
           'hidden' => 0,
         );
@@ -299,7 +299,7 @@ function gradebook_roster_page_return($form, &$form_state) {
  *   An associative array containing the structure of the form.
  * @ingroup themeable
  */
-function theme_gradebook_roster_page(&$form) {
+function theme_gradebook_roster_page($form) {
   $gradebook = $form['#gradebook'];
   $roster = gradebook_roster_get_roster($gradebook);
 
