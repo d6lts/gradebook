@@ -1,0 +1,48 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * gradebook_roster.install: Install schema for gradebook_roster
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function gradebook_roster_schema() {
+  $schema['gradebook_roster'] = array(
+    'fields' => array(
+      'gid'          => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'uid'          => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'display_name' => array('type' => 'varchar', 'length' => 64, 'not null' => FALSE),
+      'grid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'hidden'       => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny'),
+    ),
+    'primary key' => array('gid', 'uid'),
+    'indexes' => array(
+      'grid' => array('grid'),
+      'hidden' => array('hidden'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function gradebook_roster_install() {
+  // Create tables.
+  drupal_install_schema('gradebook_roster');
+  // Ensure that gradebook_roster has a greater weight than other gradebook modules.
+  $weight = (int) db_result(db_query("SELECT MAX(weight) FROM {system} WHERE name IN ('gradebook', 'og_gradebook')"));
+  db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_roster'", $weight + 1);
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function gradebook_roster_uninstall() {
+  // Remove tables.
+  drupal_uninstall_schema('gradebook_roster');
+}

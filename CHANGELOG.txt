@@ -1,5 +1,14 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2010-05-28
+----------------------
+* by MGN: Added gradebook_roster submodule
+
+Gradebook 6.x.2.x-dev, 2010-05-27
+----------------------
+#806788 by MGN: Display response to assignment on response node only if an assignment has been selected.
+* by MGN: Code cleanup to meet drupal coding standards.
+
 Gradebook 6.x.2.x-dev, 2010-03-02
 ----------------------
 #706912 by Berdir: PHP 5.3 compatibility fixes for theme functions.

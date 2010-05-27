@@ -1,0 +1,535 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Provides a roster to manage gradebook users
+ */
+
+/**
+ * Implements hook_theme().
+ */
+function gradebook_roster_theme() {
+  return array(
+    'gradebook_roster_page' => array('arguments' => array('gradebook')),
+    'gradebook_roster_form' => array('arguments' => array('form')),
+  );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function gradebook_roster_menu() {
+  $items = array();
+  $items['gradebook/%gradebookapi_gradebook/roster'] = array(
+    'title'            => 'Roster',
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('gradebook_roster_page', 1),
+    'access callback'  => 'gradebookapi_is_teacher',
+    'access arguments' => array(1),
+    'weight'           => 0,
+    'type'             => MENU_CALLBACK,
+  );
+
+  $items['gradebook/%gradebookapi_gradebook/rosteredit/%'] = array(
+    'title'            => 'Edit Roster',
+    'page callback'    => 'gradebook_roster_edit_page',
+    'page arguments'   => array(1, 3),
+    'access callback'  => 'gradebookapi_is_teacher',
+    'access arguments' => array(1),
+    'weight'           => 5,
+    'type'             => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_gradebook_grade_page_links().
+ *
+ * Adds a roster link above the gradebook page that is visible only to teachers.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ *
+ * @return $links
+ *   An array of links to be placed above the gradebook page.
+ */
+function gradebook_roster_gradebook_grade_page_links($gradebook) {
+  $links = array();
+  if (gradebookapi_is_teacher($gradebook) && !gradebook_roster_user_has_role($gradebook, 'grading assistant')) {
+    $link = l('roster', 'gradebook/' . $gradebook->tid . '/roster');
+    $links[] = $link;
+  }
+  return $links;
+}
+
+/**
+ * Implements hook_gradebookapi_students().
+ *
+ * Returns only the students that are in the roster and not hidden.
+ * Does nothing if the roster is empty.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ *
+ * @return
+ *   An array of student user ids.
+ */
+function gradebook_roster_gradebookapi_students($gradebook, $students = array('uid'=>array(), 'name'=>array())) {
+  $roster_students = _gradebook_roster_gradebookapi_role($gradebook, 'student');
+  return (count($roster_students['uid']) < 1) ? $students : $roster_students;
+}
+
+/**
+ * Implements hook_gradebookapi_teachers().
+ *
+ * Returns the teachers and grading assistamts that are in the roster
+ * and not hidden. Does nothing if the roster is empty.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ *
+ * @return
+ *   An array of teacher user ids.
+ */
+function gradebook_roster_gradebookapi_teachers($gradebook, $teachers = array('uid'=>array(), 'name'=>array())) {
+  // If the roster has any teachers or assistants, return only the roster teachers and assistants.
+  $roster_teachers = _gradebook_roster_gradebookapi_role($gradebook, 'teacher');
+  $roster_assistants = _gradebook_roster_gradebookapi_role($gradebook, 'grading assistant');
+  // Grading assistants are equivalent to teachers, but they cannot control the roster.
+  $roster_teachers += $roster_assistants;
+  return (count($roster_teachers['uid']) < 1) ? $teachers : $roster_teachers;
+}
+
+/**
+ * Obtains a list of user ids and display names matching a gradebook role.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $role_name
+ *   Role name to get user ids for.
+ *
+ * @return $role
+ *   An array of arrays:
+ *   $role['uid'] contains an array of user ids
+ *   $role['name'] contains an array of user names
+ */
+function _gradebook_roster_gradebookapi_role($gradebook, $role_name) {
+  $rname = gradebook_roster_role_names();
+  $frname = array_flip($rname);
+  $grid = $frname[$role_name];
+
+  $role = array('uid' => array(), 'name' => array());
+
+  $result = db_query('SELECT uid, display_name FROM {gradebook_roster} WHERE gid = %d AND grid = %d AND hidden = %d', $gradebook->tid, $grid, 0);
+
+  while ($entry = db_fetch_object($result)) {
+    $role['uid'][$entry->uid] = $entry->uid;
+    $role['name'][$entry->uid] = $entry->display_name;
+  }
+  return $role;
+}
+
+/**
+ * Determines if a user is assigned to a specified role.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $role_name
+ *   Role name to check against.
+ * @param $uid
+ *   The user's id.
+ *
+ * @return
+ *   TRUE if the user is assigned to the role, FALSE otherwise.
+ */
+function gradebook_roster_user_has_role($gradebook, $role_name, $uid = NULL) {
+  $rname = gradebook_roster_role_names();
+  $frname = array_flip($rname);
+  $grid = $frname[$role_name];
+  if (!isset($uid)) {
+    global $user;
+    $uid = $user->uid;
+  }
+  $count = db_result(db_query('SELECT COUNT(uid) FROM {gradebook_roster} WHERE gid = %d AND uid = %d AND grid = %d', $gradebook->tid, $uid, $grid));
+  return ($count > 0);
+}
+
+/**
+ * Loads the gradebook roster from database or builds a new roster.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ *
+ * @return $roster
+ *   The roster as an array of gradebook participants.
+ */
+function gradebook_roster_get_roster($gradebook) {
+  $roster = array();
+  if (isset($gradebook->tid)) {
+    $result = db_query('SELECT * FROM {gradebook_roster} WHERE gid = %d', $gradebook->tid);
+    while ($entry = db_fetch_array($result)) {
+      $roster[] = $entry;
+    }
+  }
+  if (empty($roster)) { 
+    $stages = array(0 => 'students', 1 => 'teachers');
+    foreach ($stages as $grid => $stage) {
+      $hookname = 'gradebookapi_get_' . $stage;
+      $members = $hookname($gradebook);
+      $use_realname = function_exists('realname_get_user');
+      foreach ($members['uid'] as $key => $uid) {
+        // Use Realname for the default display name, if available.
+        if ($use_realname) {
+          $account = realname_get_user($uid);
+          $display_name = $account->name;
+        }
+        $member = array(
+          'gid' => $gradebook->tid,
+          'uid' => $uid,
+          'name' => $members['name'][$key],
+          'display_name' =>  isset($display_name) ? $display_name : $member['name'],
+          'grid' => $grid,
+          'hidden' => 0,
+        );
+        gradebook_roster_user_save($member);
+        $roster[] = $member;
+      }
+    }
+  }
+  return $roster;
+}
+
+/**
+ * Gets a roster entry associated with a given user id.
+ *
+ * @param $gid
+ *   The gradebook id (taxonomy term).
+ * @param $uid
+ *   The user id.
+ *
+ * @return $entry
+ *   The complete roster entry as an array.
+ */
+function gradebook_roster_get_user($gid, $uid) {
+  $result = db_query('SELECT * FROM {gradebook_roster} WHERE gid = %d AND uid = %d', $gid, $uid);
+  $entry = db_fetch_array($result);
+  return $entry;
+}
+
+/**
+ * Provides a list of possible gradebook roster roles.
+ *
+ * @param $value
+ *   A gradebook role id (optional).
+ * @param $uid
+ *   The user id.
+ *
+ * @return $options
+ *   If a gradebook role id is provided, the name of the role will be returned.
+ *   Otherwise, an array of all possible roles is returned, indexed by gradebook role id.
+ */
+function gradebook_roster_role_names($value = NULL) {
+  static $options = array();
+  if (empty($options)) {
+    $options = array(0 => t('student'), 1 => t('teacher'), 2 => t('grading assistant'));
+  }
+  if (is_null($value)) {
+    return $options;
+  }
+  else {
+    return $options[$value];
+  }
+}
+
+/**
+ * Form builder for the gradebook roster page.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ *
+ * @see gradebook_roster_form_submit()
+ * @see gradebook_roster_page_return()
+ * @ingroup forms
+ */
+function gradebook_roster_page(&$form_state, $gradebook) {
+  $form = array('#theme' => 'gradebook_roster_page');
+  $form['gid'] = array('#type' => 'value', '#value' => $gradebook->tid);
+  $form['newname'] = array(
+    '#type'              => 'textfield',
+    '#size'              => 32,
+    '#autocomplete_path' => 'user/autocomplete',
+    '#weight'            => -1,
+  );
+  $form['display_name'] = array(
+    '#type'          => 'textfield',
+    '#size'          => 32,
+    '#default_value' => $roster_entry['display_name'],
+    '#required'      => FALSE,
+  );
+
+  $options = gradebook_roster_role_names();
+  $form['grid'] = array(
+    '#type'          => 'select',
+    '#options'       => $options,
+    '#default_value' => $roster_entry['grid'],
+    '#required'      => FALSE,
+  );
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Add'), '#submit' => array('gradebook_roster_form_submit'));
+  $form['return'] = array('#type' => 'submit', '#value' => t('Return to Gradebook'), '#submit' => array('gradebook_roster_page_return'));
+  $form['#gradebook'] = $gradebook;
+
+  return $form;
+}
+
+/**
+ * Redirects back to the gradebook page.
+ *
+ * @see gradebook_roster_page()
+ */
+function gradebook_roster_page_return($form, &$form_state) {
+  $form_state['redirect'] = array('gradebook/' . $form_state['values']['gid']);
+}
+
+/**
+ * Returns HTML for the gradebook roster page.
+ *
+ * @param $form
+ *   An associative array containing the structure of the form.
+ * @ingroup themeable
+ */
+function theme_gradebook_roster_page(&$form) {
+  $gradebook = $form['#gradebook'];
+  $roster = gradebook_roster_get_roster($gradebook);
+
+  $addrow = NULL;
+  $addrow[] = array('data' => drupal_render($form['newname']));
+  $addrow[] = array('data' => drupal_render($form['display_name']));
+  $addrow[] = array('data' => drupal_render($form['grid']));
+  $addrow[] = array('data' => drupal_render($form['submit']));
+  $addrows = array('data' => $addrow);
+  $addheader = array(
+    'username' => t('User Name'),
+    'displayname' => t('Display Name'),
+    'role' => t('Role'),
+    'operations' => t('Operations'),
+  );
+  $output = '<div id="gradebook-roster-table-title">' . t('Add User to Roster') . '</div>';
+  $output .= theme('table', $addheader, $addrows);
+
+  $rows = array();
+  foreach ($roster as $entry) {
+    $row = NULL;
+    $account = user_load(array('uid' => $entry['uid']));
+    $row[] = array('data' => $account->name);
+    $row[] = array('data' => $entry['display_name']);
+    $row[] = array('data' => gradebook_roster_role_names($entry['grid']));
+    $row[] = array('data' => $entry['hidden'] ? t('Yes') : t('No'));
+    $edit = l(t('edit'), 'gradebook/' . $gradebook->tid . '/rosteredit/' . $entry['uid']);
+    $row[] = array('data' => $edit);
+    $rows[] = array('data' => $row, 'style' => $entry['hidden'] ? 'font-style:italic' : NULL);
+  }
+
+  if (!empty($rows)) {
+    $header = array(
+      'username' => t('Name'), 
+      'displayname' => t('Display Name'),
+      'role' => t('Role'),
+      'hidden' => t('Hidden'),
+      'operations' => t('Operations'),
+    );
+    $output .= '<div id="gradebook-roster-table-title">' . t('Current Roster') . '</div>';
+    $output .= theme('table', $header, $rows);
+  }
+  $output .= drupal_render($form['return']);
+  $output .= drupal_render($form);
+  return $output; 
+}
+
+/**
+ * Page callback for editing or deleting a roster entry.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $uid
+ *   The user id for the roster entry.
+ */
+function gradebook_roster_edit_page($gradebook, $uid) {
+  if (!is_null($uid)) {
+    if ((isset($_POST['op']) && $_POST['op'] == t('Delete')) || isset($_POST['confirm'])) {
+      return drupal_get_form('gradebook_roster_confirm_delete', $gradebook->tid, $uid);
+    }
+    $edit = gradebook_roster_get_user($gradebook->tid, $uid);
+  }
+  return drupal_get_form('gradebook_roster_form', $gradebook->tid, $uid, $edit);
+}
+
+/**
+ * Form builder for the gradebook roster form.
+ *
+ * @param $gid
+ *   The gradebook id (taxonomy term id).
+ * @param $uid
+ *   The user id for the roster entry.
+ * @param $roster_entry
+ *   The complete roster entry array.
+ *
+ * @see gradebook_roster_form_cancel()
+ * @see gradebook_roster_form_submit()
+ * @see theme_gradebook_roster_form()
+ * @ingroup forms
+ */
+function gradebook_roster_form(&$form_state, $gid, $uid = NULL, $roster_entry = array()) {
+  $form = array('#theme' => 'gradebook_roster_form');
+  $form['gid'] = array('#type' => 'value', '#value' => $gid);
+  if (is_null($uid)) {
+    $form['newname'] = array(
+      '#type'              => 'textfield',
+      '#title'             => t('User Name'),
+      '#maxlength'         => 60,
+      '#autocomplete_path' => 'user/autocomplete',
+      '#weight'            => -1,
+    );
+  }
+  else {
+    $form['uid'] = array('#type' => 'value', '#value' => $uid);
+  }
+  $account = user_load(array('uid' => $uid));
+  $form['#accountname'] = $account->name;
+  $form['#username'] = theme('username', $account);
+  $form['display_name'] = array(
+    '#type'          => 'textfield',
+    '#title'         => t('Display Name'),
+    '#size'          => 32,
+    '#default_value' => isset($roster_entry['display_name']) ? $roster_entry['display_name'] : NULL,
+  );
+
+  $options = gradebook_roster_role_names();
+  $form['grid'] = array(
+    '#type'          => 'select',
+    '#title'         => t('Role'),
+    '#options'       => $options,
+    '#default_value' => isset($roster_entry['grid']) ? $roster_entry['grid'] : 0,
+  );
+  $form['hidden'] = array(
+    '#type'          => 'checkbox',
+    '#title'         => t('Hidden'),
+    '#default_value' => isset($roster_entry['hidden']) ? $roster_entry['hidden'] : FALSE,
+    '#description'   => t('If checked, this user will not appear in the gradebook but will remain in the roster.'),
+  );
+
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Save'));
+  $form['delete'] = array('#type' => 'submit', '#value' => t('Delete'));
+  $form['cancel'] = array('#type' => 'submit', '#value' => t('Cancel'), '#submit' => array('gradebook_roster_form_cancel'));
+  return $form;
+}
+
+/**
+ * Redirect back to the roster page when form editing is canceled.
+ *
+ * @see gradebook_roster_form()
+ */
+function gradebook_roster_form_cancel($form, &$form_state) {
+  $form_state['redirect'] = array('gradebook/' . $form_state['values']['gid'] . '/roster');
+}
+
+/**
+ * Form submission handler for the gradebook_roster_form().
+ *
+ * @see gradebook_roster_page()
+ * @see gradebook_roster_form()
+ */
+function gradebook_roster_form_submit($form, &$form_state) {
+  $edit = $form_state['values'];
+  $update = TRUE;
+  if (isset($edit['newname'])) {
+    $account = user_load(array('name' => $edit['newname']));
+    $edit['uid'] = $account->uid;
+    $update = FALSE;
+  }
+  gradebook_roster_user_save($edit, $update);
+  $form_state['redirect'] = array('gradebook/' . $edit['gid'] . '/roster');
+}
+
+/**
+ * Form builder; Builds the confirmation form for deleting a roster entry.
+ *
+ * @ingroup forms
+ * @see gradebook_roster_confirm_delete_submit()
+ */
+function gradebook_roster_confirm_delete(&$form_state, $gid, $uid) {
+  $form = array();
+  $form['#gid'] = $gid;
+  $form['#uid'] = $uid;
+  $account = user_load(array('uid' => $entry['uid']) );
+  return confirm_form(
+    $form,
+    t('Are you sure you want to delete the roster entry for %name?', array('%name' => $account->name)),
+    'gradebook/' . $gid . '/roster',
+    t('This action cannot be undone.'),
+    t('Delete'),
+    t('Cancel')
+  );
+}
+
+/**
+ * Process gradebook_roster_confirm_delete form submissions.
+ */
+function gradebook_roster_confirm_delete_submit($form, &$form_state) {
+  gradebook_roster_user_delete($form['#gid'], $form['#uid']);
+  drupal_set_message(t('The gradebook roster entry has been deleted.'));
+  watchdog('gradebook_roster', 'gradebook_roster: deleted user %uid from gradebook %gid.', array('%uid' => $form['#uid'],'%gid' => $form['#gid']), WATCHDOG_NOTICE);
+  $form_state['redirect'] = 'gradebook/' . $form['#gid'] . '/roster';
+  return;
+}
+
+/**
+ * Returns HTML for the gradebook roster form.
+ *
+ * @param $form
+ *   An associative array containing the structure of the form.
+ * @ingroup themeable
+ */
+function theme_gradebook_roster_form(&$form) {
+  $output = '<p>';
+  $output .= t('Provide a display name and role for this student. The display name will appear in the gradebook in place of the user name.');
+  $output .= '</p>';
+  $output .= t('User') . ': ' . $form['#accountname'] . ' (' . $form['#username'] . ')';
+  $output .= drupal_render($form['display_name']);
+  $output .= drupal_render($form['grid']);
+  $output .= drupal_render($form['hidden']);
+  $output .= '<div class="container-inline">' . drupal_render($form['submit']);
+  $output .= drupal_render($form['cancel']) . drupal_render($form['delete']) . '</div>';
+  $output .= drupal_render($form);
+  return $output;
+}
+
+/**
+ * Deletes a user's roster entry.
+ *
+ * @param $gid
+ *   The gradebook id (taxonomy term id).
+ * @param $uid
+ *   The user id.
+ */
+function gradebook_roster_user_delete($gid, $uid) {
+  db_query('DELETE FROM {gradebook_roster} WHERE gid = %d AND uid = %d', $gid, $uid);
+}
+
+/**
+ * Saves a user's roster entry.
+ *
+ * @param $edit
+ *   The roster entry array to save.
+ * @param $update
+ *   TRUE if the entry is to be updated, FALSE to insert a new roster entry.
+ */
+function gradebook_roster_user_save($edit, $update = FALSE) {
+  if ($update) {
+    db_query("UPDATE {gradebook_roster} SET display_name = '%s', grid = %d, hidden = %d WHERE uid = %d AND gid = %d", $edit['display_name'], $edit['grid'], $edit['hidden'], $edit['uid'], $edit['gid']);
+  }
+  else {
+    db_query("INSERT INTO {gradebook_roster} (gid, uid, display_name, grid, hidden) VALUES (%d, %d, '%s', %d, %d)",  $edit['gid'], $edit['uid'], $edit['display_name'], $edit['grid'], $edit['hidden']);
+  }
+}

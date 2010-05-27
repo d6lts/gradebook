@@ -245,6 +245,25 @@ IV. Description of Optional Submodules
           b. Weight the final grade by category multiplier.
              - This option multiplies the points in a category by a given percentage.
 
+4.  Gradebook Roster provides a simple roster for each gradebok. When this
+    module is enabled, teachers will find a Roster link above the gradebook
+    page that can be used to define and modify the roster.
+    A. When the roster is initialized, all students and teachers will be added.
+       i.  A display name can be chosen that will appear in place of the user
+           name in the gradebook.
+       ii. Initially the display name is the same as the user name, unless the
+           RealName module is installed. If that module is enabled, then the
+           users RealName will be used.
+    B. Users can be deleted or hidden from the roster.
+       i.  Deleting a user from the roster only affects the gradebook display.
+           Existing gradebook information will be preserved, and the user can
+           be added back to the roster at a later time.
+       ii. Hiding a user keeps them in the roster, but while hidden they are not
+           considered to be a student or teacher.
+    C. Users can be assigned role of teacher, student or grading assistant.
+       i. Grading assistants can do everything a teacher can do, except they
+          cannot modify the roster.
+
 V. Developer notes
 ------------------
 1. The Gradebook module was written for Drupal 4.7 and 5 by Robert Wohleb and was ported
