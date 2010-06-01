@@ -6,8 +6,7 @@
  */
 
 /**
- *  Implementation of hook_views_api().
- *    integrate gradebook with views 2
+ * Implementation of hook_views_api().
  */
 function gradebookapi_views_api() {
   return array('api' => 2.0);
@@ -384,7 +383,11 @@ function gradebookapi_set_grade($grade) {
   foreach ($terms as $term) {
     gradebookapi_calc_grades($grade->uid, $term->tid);
   } 
-  module_invoke_all('gradebookapi_grade', 'set', $grade); // allow other modules to take action after a grade is saved
+  $modules = module_implements('gradebookapi_grade');
+  foreach ($modules as $module) {
+    $func = $module.'_gradebookapi_grade';
+    $func('set', $grade); //allows pass by reference!
+  }
 }
 
 /**
@@ -502,7 +505,8 @@ function gradebookapi_calc_grades($uid, $tid, $recursive=TRUE) {
  *  @return  associative array with keys 'earned' and 'possible' for the weighted earned and possible grades.
  */
 function gradebookapi_weight_grade($gid, $tid, $catpossible, $catearned) {
-  $module = array_pop(module_implements('gradebookapi_weighted_grade'));
+  $modules = module_implements('gradebookapi_weighted_grade');
+  $module = array_pop($modules);
   return ($module) ?  module_invoke($module,'gradebookapi_weighted_grade', $gid, $tid, $catpossible, $catearned) : array('earned' => $catearned, 'possible' => $catpossible);
 }
 
@@ -513,7 +517,8 @@ function gradebookapi_weight_grade($gid, $tid, $catpossible, $catearned) {
  *  @return 
  */
 function gradebookapi_get_weights($gid) {
-  $module = array_pop(module_implements('gradebookapi_get_gradebook_weights'));
+  $modules = module_implements('gradebookapi_get_gradebook_weights');
+  $module = array_pop($modules);
   return ($module) ?  module_invoke($module,'gradebookapi_get_gradebook_weights', $gid) : array();
 }
 

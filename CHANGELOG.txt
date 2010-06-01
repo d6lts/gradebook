@@ -1,5 +1,12 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2010-06-01
+----------------------
+#655636 by MGN: Improving views support for gradebook and its submodules.
+* by MGN: More code cleanup to meet drupal coding standards.
+* by MGN: Replaced module_invoke_all code in gradebookapi_set_grade with
+          module_implements because of problems attaching files to gradebook.
+
 Gradebook 6.x.2.x-dev, 2010-05-28
 ----------------------
 * by MGN: Added gradebook_roster submodule

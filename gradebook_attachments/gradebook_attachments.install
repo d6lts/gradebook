@@ -19,7 +19,7 @@ function gradebook_attachments_schema() {
       'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'fid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'list'        => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny',
-                             'description' => t('Whether the file should be visibly listed on the grade note.'), ),
+                             'description' => 'Whether the file should be visibly listed on the grade note.'),
       'description' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
     ),
     'indexes' => array(

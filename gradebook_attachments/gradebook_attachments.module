@@ -6,14 +6,20 @@
  */
 
 /**
- * Implementation of hook_perm().
+ * Implement hook_views_api().
+ */
+function gradebook_attachments_views_api() {
+  return array('api' => 2.0);
+}
+/**
+ * Implement hook_perm().
  */
 function gradebook_attachments_perm() {
   return array('attach files to gradebook', 'access gradebook attachments folder');
 }
 
 /**
- * Implementation of hook_user().
+ * Implement hook_user().
  *
  * @return NONE
  */
@@ -33,7 +39,7 @@ function gradebook_attachments_user($op, &$edit, &$account, $category = NULL) {
 }
 
 /**
- * Implementation of hook_menu().
+ * Implement hook_menu().
  */
 function gradebook_attachments_menu() {
   $items = array();
@@ -48,7 +54,7 @@ function gradebook_attachments_menu() {
 }
 
 /**
- * Implementation of hook_file_download().
+ * Implement hook_file_download().
  */
 function gradebook_attachments_file_download($path) {
   global $user;
@@ -65,14 +71,24 @@ function gradebook_attachments_file_download($path) {
   // Allow file access only if file belongs to the logged in user, or is attached to the logged in users' grade.
   // Teachers of the logged in user can also access the file.
   if (($user->uid == $file->uid) || ($user->uid == $attached->uid) || $teacher) {
-    return array('Content-type: '. file_get_mimetype($path));
+    return array('Content-type: ' . file_get_mimetype($path));
   }
   else {
     return -1;
   }
 }
 
-// If there is a file attached to the grade, load the file object.
+/**
+ * Loads the file objects if the grade has attachments.
+ *
+ * @param $nid
+ *   The assignment node id.
+ * @param $uid
+ *   The user id for the user who attached the file.
+ *
+ * @return $files
+ *   An array of file objects, indexed by file id.
+ */
 function gradebook_attachments_load_attachment($nid, $uid = NULL) {
   $files = array();
   if (isset($nid)) {
@@ -88,19 +104,30 @@ function gradebook_attachments_load_attachment($nid, $uid = NULL) {
   return $files;
 }
 
+/**
+ * Determines if an assignment grade has an attachment.
+ *
+ * @param $nid
+ *   The assignment node id.
+ * @param $uid
+ *   The user id for the user who attached the file.
+ *
+ * @return
+ *   TRUE if the grade has an attachment, FALSE otherwise.
+ */
 function gradebook_attachments_grade_has_attachment($nid, $uid) {
   $count = db_result(db_query('SELECT COUNT(fid) FROM {gradebookapi_files} WHERE nid = %d AND uid = %d', $nid, $uid));
   return ($count > 0);
 }
 
 /**
- * Implementation of hook_gradebookapi_grade().
+ * Implement hook_gradebookapi_grade().
  *
  */
 function gradebook_attachments_gradebookapi_grade($action, &$grade) {
   switch ($action) {
     // Save or remove any attachments.
-    case 'set':  
+    case 'set':
       gradebook_attachments_manage_attachments($grade);
       break;
     // Load attachmets and store in grade object.
@@ -164,9 +191,7 @@ function gradebook_attachments_remove_file($file) {
 }
 
 /**
- * Implementation of hook_form_alter().
- *
- * @return NONE
+ * Implement hook_form_alter().
  */
 function gradebook_attachments_form_alter(&$form, $form_state, $form_id) {
  // Add attachment options to the sitewide gradebook settings form.
@@ -215,9 +240,7 @@ function gradebook_attachments_form_alter(&$form, $form_state, $form_id) {
 }
 
 /**
- * Implementation of hook_nodeapi().
- *
- * @return NONE
+ * Implement hook_nodeapi().
  */
 function gradebook_attachments_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
   if (in_array($node->type, (array)gradebookapi_get_assignment_types())) {
@@ -244,7 +267,7 @@ function gradebook_attachments_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
 }
 
 /**
- * Implementation of hook_gradebook_grade_class().
+ * Implement hook_gradebook_grade_class().
  *  return a css class name to style the gradebook_grade_page when a gradebook entry has
  *  an attachment.
  */
@@ -253,7 +276,7 @@ function gradebook_attachments_gradebook_grade_class($nid, $uid) {
 }
 
 /**
- * Implementation of hook_gradebook_form_add_elements().
+ * Implement hook_gradebook_form_add_elements().
  */
 function gradebook_attachments_gradebook_form_add_elements(&$form, &$form_state, $grades, $gradebook) {
   global $user;
@@ -380,23 +403,33 @@ function gradebook_attachments_upload_form_attach_another($form, &$form_state) {
 }
 
 /**
- * Implementation of hook_gradebook_theme_add_content().
+ * Implement hook_gradebook_theme_add_content().
+ *
  *  Theme content added to the gradebook_grade_form
- *  @param $position is a string indicating the location in the form to place the information
- *    possbilities supported by gradebookapi include 'title', 'note', and 'bottom'
- *  @param $form is the gradebook_grade_form
- *    passed by reference to allow drupal_render to work correctly
- *    note that this function should not be called by drupal api functions that do not support call by reference
- *  @param $id is the identification number for the grade to be themed
- *  @param $teacher is TRUE if the user is a teacher associated with the gradebook
- *  @return $output is rendered html
+ *
+ *  @param $position 
+ *    A string indicating the location in the form to place the information
+ *    possbilities supported by gradebookapi include 'title', 'note', and 'bottom'.
+ *  @param $form
+ *    The gradebook_grade_form passed by reference to allow drupal_render to work correctly
+ *    note that this function should not be called by drupal api functions that do not
+ *    support call by reference.
+ *  @param $id
+ *    The identification number for the grade to be themed.
+ *
+ *  @param $teacher
+ *    TRUE if the user is a teacher associated with the gradebook, FALSE otherwise.
+ *
+ *  @return $output 
+ *    HTML to be added to the gradebook grade form.
  */
 function gradebook_attachments_gradebook_theme_add_content($position, &$form, $id, $teacher) {
+  $output = NULL;
   switch ($position) {
     case 'note':
-      $keys = element_children($form['grade'][$id]['attachments']['files']);
-      if (count($keys) > 0) {
+      if (isset($form['grade'][$id]['attachments']['files'])) {
         // Show attachment table if files are attached.
+        $keys = element_children($form['grade'][$id]['attachments']['files']);
         $attachment_header = array(t('Attachment'), t('Uploaded on'), t('Link'), t('List'), t('Remove'));
         $attachment_rows = NULL;
         foreach ($keys as $key) {
@@ -416,15 +449,25 @@ function gradebook_attachments_gradebook_theme_add_content($position, &$form, $i
             $attachment_rows[] = array('data' => $attachment_row);
           }
         }
-      $output = (count($attachment_rows) > 0) ? theme('table', $attachment_header, $attachment_rows) : '';
+        $output = (count($attachment_rows) > 0) ? theme('table', $attachment_header, $attachment_rows) : '';
       }
-      return $output;
+      break;
     case 'bottom':
       $output =  drupal_render($form['new']['upload']) . drupal_render($form['new']['attach']);
-      return $output;
+      break;
   }
+  return $output;
 }
 
+/**
+ * Creates form element to control gradebook attachments for the assignment node.
+ *
+ * @param $node
+ *   The node object.
+ *
+ * @return
+ *   The form array with 'attach_status' form element.
+ */ 
 function gradebook_attachments_form_elements($node) {
   $form = array();
   $options = array(0 => t('Allow student attachments at all times'),
@@ -443,12 +486,38 @@ function gradebook_attachments_form_elements($node) {
   return $form;
 }
 
+/**
+ * Determines whether or not the user can attach files to the gradebook.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $teacher
+ *   TRUE if the user is a teacher associated with the gradebook, FALSE otherwise.
+ *
+ * @return
+ *   TRUE if the user is allowed to attach files to the gradebook, FALSE otherwise.
+ */
 function gradebook_attachments_attachment_permitted_user($gradebook, $teacher) {
   $attach_allowed = array_filter((array)variable_get('gradebook_attachment_roles', array()));
   $attach_permission = (gradebookapi_is_student($gradebook) && in_array('students', $attach_allowed)) || ($teacher && in_array('teachers', $attach_allowed)) || user_access('attach files to gradebook');
   return $attach_permission;
 }
 
+/**
+ * Determines whether or not attachments are permitted for an assignment node.
+ *
+ * @param $node
+ *   The assignment node object.
+ * @param $gid
+ *   The gradebook id (taxonomy term id)
+ * @param $teacher
+ *   TRUE if the user is a teacher associated with the gradebook, FALSE otherwise.
+ * @param $graded
+ *   TRUE if the assignment has been graded, FALSE otherwise.
+ *
+ * @return
+ *   TRUE if attachments are permitted for the assignment, FALSE otherwise.
+ */ 
 function gradebook_attachments_attachment_permitted_node($node, $gid, $teacher = FALSE, $graded = FALSE) {
   // Attachments are permitted unless there are restrictions.
   $permission = TRUE;
@@ -457,15 +526,15 @@ function gradebook_attachments_attachment_permitted_node($node, $gid, $teacher =
   if (!$teacher && isset($attach_restrictions)) {
     switch ($attach_restrictions) {
       case 1:
-        // No attachments allowed after due date.
+        // No attachments are allowed after due date.
         $permission = !(time() > $node->due_date);
         break;
       case 2:
-        // No attachments allowed after assignment has been graded.
+        // No attachments are allowed after assignment has been graded.
         $permission = !graded;
         break;
       case 3:
-        // No attachments permitted.
+        // No attachments are permitted.
         $permission = FALSE;
         break;
       case 0:

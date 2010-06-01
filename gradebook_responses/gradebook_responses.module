@@ -6,6 +6,14 @@
  */
 
 /**
+ *  Implementation of hook_views_api().
+ *    integrate gradebook with views 2
+ */
+function gradebook_responses_views_api() {
+  return array('api' => 2.0);
+}
+
+/**
  * Implementation of hook_theme().
  */
 function gradebook_responses_theme() {
@@ -559,7 +567,7 @@ function gradebook_responses_gradebook_grade_class($nid, $uid) {
 /**
  * Implementation of hook_gradebookapi_grade().
  */
-function gradebook_responses_gradebookapi_grade($action, $grade) {
+function gradebook_responses_gradebookapi_grade($action, &$grade) {
   switch($action) {
     case 'set':
       gradebook_responses_update_responses($grade);
@@ -567,6 +575,7 @@ function gradebook_responses_gradebookapi_grade($action, $grade) {
     case 'get':
       break;
   }
+  return $grade;
 }
 
 /**

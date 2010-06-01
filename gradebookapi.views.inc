@@ -6,7 +6,7 @@
  * This is experimental and still in progress...
  */
 
-/*
+/**
  *
  * Database definition:
  * @code
@@ -22,11 +22,24 @@
  *    ),
  *    'primary key' => array('nid'),
  *  );
+ *
+ *  $schema['gradebookapi_grade'] = array(
+ *    'fields' => array(
+ *      'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+ *      'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+ *      'earned'      => array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE),
+ *      'exempt'      => array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'size' => 'tiny', 'default' => 0),
+ *      'timestamp'   => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+ *      'note'        => array('type' => 'text', 'unsigned' => FALSE, 'not null' => FALSE, 'size' => 'big'),
+ *     ),
+ *    'primary key' => array('nid', 'uid'),
+ *  );
+ *
  * @endcode
  */
 
 /**
- * Implementation of hook_views_data().
+ * Implement hook_views_data().
  */
 function gradebookapi_views_data()  {
   // Basic table information.
@@ -43,8 +56,23 @@ function gradebookapi_views_data()  {
       'left_field' => 'nid',
       'field' => 'nid',
     ),
+    'gradebookapi_grade' => array(
+      'type' => 'INNER',
+      'left_field' => array('nid', 'uid'),
+      'field' => 'nid',
+    ),
   );
-
+  $data['gradebookapi_grade']['table']['join'] = array(
+    'node' => array(
+      'left_field' => 'nid',
+      'field' => 'nid',
+    ),
+    'gradebookapi_assignment' => array(
+      'type' => 'INNER',
+      'left_field' => 'nid',
+      'field' => 'nid',
+    ),
+  );
   // Due_date.
   $data['gradebookapi_assignment']['due_date'] = array(
     'title' => t('Due Date'),
@@ -105,34 +133,78 @@ function gradebookapi_views_data()  {
       'left_field' => 'nid',
       'field' => 'nid',
     ),
-
   );
+
+  $data['gradebookapi_grade']['earned'] = array(
+    'title' => t('Earned'),
+    'help' => t('Points earned for assignment.'),
+    'field' => array(
+      'handler' => 'views_handler_field_numeric',
+      'click sortable' => TRUE,
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_numeric',
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+  );
+
+  $data['gradebookapi_grade']['exempt'] = array(
+    'title' => t('Exempt'),
+    'help' => t('Student is exempted from this assignment.'),
+    'field' => array(
+      'handler' => 'views_handler_field_boolean',
+      'click sortable' => TRUE,
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_boolean_operator',
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+  );
+
+  $data['gradebookapi_grade']['note'] = array(
+    'title' => t('Note'),
+    'help' => t('Text explaining grade to the student.'),
+    'field' => array(
+      'handler' => 'views_handler_field_markup',
+      'format' => FILTER_FORMAT_DEFAULT,
+
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_string',
+    ),
+  );
+
   $data['gradebookapi_grade']['uid'] = array(
-    'title' => t('User'),
-    'help' => t('The user associated with the grade.'),
+    'title' => t('Student'),
+    'help' => t('The student associated with the grade.'),
     'relationship' => array(
       'base' => 'users',
       'field' => 'uid',
       'handler' => 'views_handler_relationship',
-      'label' => t('User'),
+      'label' => t('Student'),
     ),
   );
 
   $data['gradebookapi_grade']['nid'] = array(
-    'title' => t('Node'),
+    'title' => t('Assignment node'),
     'help' => t('The node associated with the grade.'),
     'relationship' => array(
       'base' => 'node',
       'field' => 'nid',
       'handler' => 'views_handler_relationship',
-      'label' => t('Node'),
+      'label' => t('Assignment node'),
     ),
   );
+
   return $data;
 }
 
 /**
- * Implementation of hook_date_api_fields().
+ * Implement hook_date_api_fields().
  */
 function gradebookapi_date_api_fields($field) {
   if ($field == 'gradebookapi_assignment.publish_date') {
