@@ -88,40 +88,22 @@
 }
 
 /**
- * Rules for formating gradebook table grade entries
+ * Rules for formating gradebook table grade entries (and legend).
  */
-
-.gradebook .grade {
+.gradebook .empty {
   text-align: center;
 }
 
-.gradebook .grade-response,
-.gradebook .grade-response a {
-  color: #FF0000;
+.gradebook .grade,
+.gradebook-legend-item.grade {
   text-align: center;
-  font-size: 130%;
+  background-color: #00FF00;
+  list-style: none;
+  list-style-type: none;
 }
 
-.gradebook .grade-attachment,
-.gradebook .grade-attachment a {
-  color: #FF0000;
+.gradebook .term-grade {
   text-align: center;
-  font-weight: bold;
-}
-
-.gradebook .grade-attachment-response,
-.gradebook .grade-response-attachment,
-.gradebook .grade-response-attachment a,
-.gradebook .grade-attachment-response a {
-  color: #FF0000;
-  text-align: center;
-  font-size: 130%;
-  font-weight: bold;
-}
-
-.gradebook .term_grade {
-  text-align: center;
-  border-bottom: 1px solid #000000;
   color: #FF0000;
 }
 
@@ -129,8 +111,9 @@
  *  Rules to provide line through exempted grade
  */
 
-.gradebook  .exempt,
-.gradebook  .exempt a {
+.gradebook .exempt,
+.gradebook .exempt a,
+.gradebook-legend-item.exempt {
   text-decoration: line-through;
   color: #AA0000;
 }
@@ -139,26 +122,66 @@
  *  Rules to format the extra fields added to assignment nodes.
  */
 
-.gradebook-assignment-due {
-  color: #FF0000;
-  font-size: 89%;
-  font-style: italic;
-  padding: 1em 0 0 1em;
+.gradebook-assignment-notice {
+  border:.75pt solid #317082;;
+  border-left-width: 5px;
+  vertical-align: top;
+  background: #e2ebed;
+  color: #027ac6;
+	 padding: 10px;
+	 margin-top: 20px;
+	 margin-bottom: 20px;
+	 margin-right: auto;
+	 margin-left: auto; 	
   text-align: left;
 }
 
-.gradebook-assignment-due-date {
+.gradebook-assignment-notice ul.gradebook-assignment-category li {
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
+  font-weight: bold;
+}
+
+.gradebook-assignment-notice .gradebook-assignment-due {
+  color: #027ac6;
+}
+
+.gradebook-assignment-notice .gradebook-assignment-due-date {
   color: #FF0000;
 }
 
-.gradebook-assignment-possible {
-  color: #FF0000;
-  font-size: 89%;
-  font-style: italic;
-  padding: 0 0 1em 1em;
-  text-align: left;
+.gradebook-assignment-notice .gradebook-assignment-possible {
+  color: #027ac6;
 }
 
-.gradebook-assignment-possible-points {
+.gradebook-assignment-notice .gradebook-assignment-possible-points {
   color: #FF0000;
 }
+
+/**
+ *  Rules for the Gradebook Legend
+ */
+table td.gradebook-mini,
+table th.gradebook-mini,
+table.gradebook-mini {
+ 	padding:0 1px 0 0;
+ 	margin:0;
+ 	}
+table td.gradebook-mini a {
+ 	font-weight:normal;
+ 	}
+
+.gradebook-mini {
+ 	font-size:.7em;
+ 	width:32%;
+ 	vertical-align:top;
+ 	} 
+
+table.gradebook-legend {
+  background-color:#ccc;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+

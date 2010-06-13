@@ -1,0 +1,88 @@
+/* $Id$ */
+
+/**
+ * @file
+ * CSS rules for formating gradebook responses
+ */
+
+/**
+ * Rules for formating gradebook table grade entries (and legend).
+ */
+
+.gradebook .redo-box {
+  border: 2px solid #ccc;
+  text-align: center;
+}
+
+.response-list-block h1.response-list-title {
+  font-size: 100%;
+}
+
+.response-list-block ul.response-list {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+.empty.response.inprogress,
+.gradebook-legend-item.response.inprogress {
+  background-color:#FFCC00;
+}
+
+.empty.response,
+.gradebook-legend-item.response.notset {
+  background-color:FFCCFF;
+}
+
+.empty.response.completed,
+.gradebook-legend-item.response.completed {
+  background-color:#FFFF00;
+}
+
+.grade.response.redo-grade,
+.gradebook-legend-item.response.redo-grade {
+  color:#FFFFFF;
+  background-color:#660066;
+}
+
+.gradebook .grade.response,
+.gradebook .grade.response a {
+  text-align: center;
+}
+/**
+ *  Rules for the notice on response nodes.
+ */
+.gradebook-response-assignment {
+  border:.75pt solid #317082;;
+  border-left-width: 5px;
+  vertical-align: top;
+  background: #e2ebed;
+  color: #027ac6;
+  padding: 10px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  margin-right: auto;
+  margin-left: auto; 	
+  text-align: left;
+}
+
+.gradebook-response-status {
+  color: #027ac6;
+  text-align: left;
+}
+
+.gradebook-response-status-string {
+  font-weight: bold;
+}
+
+.gradebook-response-assignment-title {
+  font-weight: bold;
+}
+
+.gradebook-response-number {
+  font-weight: normal;
+}
+
+.gradebook-response-permitted {
+  font-weight: bold;
+}

@@ -7,11 +7,10 @@
  */
 
 /**
- * Implementation of hook_schema().
+ * Implements hook_schema().
  */
 
 function gradebook_responses_schema() {
-
   $schema['gradebook_responses'] = array(
     'fields' => array(
       'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
@@ -31,33 +30,100 @@ function gradebook_responses_schema() {
 }
 
 /**
- * Implementation of hook_install().
+ * Implements hook_schema_alter().
  */
+function gradebook_responses_schema_alter(&$schema) {
+  // Gradebook Responses adds these fields to the gradebookapi_assignment table.
 
+  $schema['gradebookapi_assignment']['fields']['response_types'] = array(
+    'type' => 'varchar',
+    'length' => 255,
+    'not null' => FALSE,
+    'description' => 'A comma delimited list of allowed response types for this assignment.',
+  );
+
+  $schema['gradebookapi_assignment']['fields']['max_responses'] = array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 0,
+  );
+
+// Gradebook Responses adds this field to the gradebookapi_grade table.
+
+  $schema['gradebookapi_grade']['fields']['redo'] = array(
+    'type' => 'int',
+    'unsigned' => FALSE,
+    'not null' => TRUE,
+    'size' => 'tiny',
+    'default' => 0,
+  );
+}
+
+/**
+ * Implements hook_install().
+ */
 function gradebook_responses_install() {
   // Create tables.
   drupal_install_schema('gradebook_responses');
-  db_add_field($ret, 'gradebookapi_assignment', 'response_types', array('type' => 'varchar', 'length' => 255, 'not null' => FALSE, 'description' =>t("A comma delimited list of allowed response types for this assignment.")));
-  // Insure that submodules have a greater weight than gradebookapi
+
+  // Add new fields to the gradebookapi_assignment database table.
+  db_add_field($ret, 'gradebookapi_assignment', 'response_types', array('type' => 'varchar', 'length' => 255, 'not null' => FALSE, 'description' => "A comma delimited list of allowed response types for this assignment."));
+  db_add_field($ret, 'gradebookapi_assignment', 'max_responses', array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0));
+  // Add new fields to the gradebookapi_grade database table.
+  db_add_field($ret, 'gradebookapi_grade', 'redo', array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'size' => 'tiny', 'default' => 0));
+  // Ensure that submodules have a greater weight than gradebookapi.
   $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
   db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_responses'", $weight + 1);
 }
 
 /**
- * Implementation of hook_uninstall().
+ * Implements hook_uninstall().
  */
 function gradebook_responses_uninstall() {
-
   // Remove tables.
   drupal_uninstall_schema('gradebook_responses');
 }
 
+/**
+ * Implements hook_update_N().
+ */
 function gradebook_responses_update_6200() {
-  // Insure that submodules have a greater weight than gradebookapi
+  $ret = array();
+  // Ensure that submodules have a greater weight than gradebookapi
   $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
-  db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_responses'", $weight + 1);
+  ++$weight;
+  $ret[] = update_sql("UPDATE {system} SET weight = $weight WHERE name = 'gradebook_responses'");
+
+  return $ret;
 }
 
+/**
+ * Adds the response_types field to the gradebookapi_assignment database table.
+ */
 function gradebook_responses_update_6201() {
-  db_add_field($ret, 'gradebookapi_assignment', 'response_types', array('type' => 'varchar', 'length' => 255, 'not null' => FALSE, 'description' =>t("A comma delimited list of allowed response types for this assignment.")));
+  $ret = array();
+  db_add_field($ret, 'gradebookapi_assignment', 'response_types', array('type' => 'varchar', 'length' => 255, 'not null' => FALSE, 'description' => 'A comma delimited list of allowed response types for this assignment.'));
+
+ return $ret;
+}
+
+/**
+ * Adds the max_responses field to the gradebookapi_assignment database table.
+ */
+function gradebook_responses_update_6202() {
+  $ret = array();
+  db_add_field($ret, 'gradebookapi_assignment', 'max_responses', array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0));
+
+  return $ret;
+}
+
+/**
+ * Adds the redo field to the gradebookapi_grade database table.
+ */
+function gradebook_responses_update_6203() {
+  $ret = array();
+db_add_field($ret, 'gradebookapi_grade', 'redo', array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'size' => 'tiny', 'default' => 0));
+
+  return $ret;
 }

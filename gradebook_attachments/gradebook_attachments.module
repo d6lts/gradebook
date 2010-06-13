@@ -6,20 +6,21 @@
  */
 
 /**
- * Implement hook_views_api().
+ * Implements hook_views_api().
  */
 function gradebook_attachments_views_api() {
   return array('api' => 2.0);
 }
+
 /**
- * Implement hook_perm().
+ * Implements hook_perm().
  */
 function gradebook_attachments_perm() {
   return array('attach files to gradebook', 'access gradebook attachments folder');
 }
 
 /**
- * Implement hook_user().
+ * Implements hook_user().
  *
  * @return NONE
  */
@@ -39,7 +40,15 @@ function gradebook_attachments_user($op, &$edit, &$account, $category = NULL) {
 }
 
 /**
- * Implement hook_menu().
+ * Implements hook_init().
+ */
+function gradebook_attachments_init() {
+  // Add the CSS for this module.
+  drupal_add_css(drupal_get_path('module', 'gradebook_attachments') . '/gradebook_attachments.css');
+}
+
+/**
+ * Implements hook_menu().
  */
 function gradebook_attachments_menu() {
   $items = array();
@@ -54,7 +63,7 @@ function gradebook_attachments_menu() {
 }
 
 /**
- * Implement hook_file_download().
+ * Implements hook_file_download().
  */
 function gradebook_attachments_file_download($path) {
   global $user;
@@ -121,7 +130,7 @@ function gradebook_attachments_grade_has_attachment($nid, $uid) {
 }
 
 /**
- * Implement hook_gradebookapi_grade().
+ * Implements hook_gradebookapi_grade().
  *
  */
 function gradebook_attachments_gradebookapi_grade($action, &$grade) {
@@ -191,7 +200,7 @@ function gradebook_attachments_remove_file($file) {
 }
 
 /**
- * Implement hook_form_alter().
+ * Implements hook_form_alter().
  */
 function gradebook_attachments_form_alter(&$form, $form_state, $form_id) {
  // Add attachment options to the sitewide gradebook settings form.
@@ -240,17 +249,17 @@ function gradebook_attachments_form_alter(&$form, $form_state, $form_id) {
 }
 
 /**
- * Implement hook_nodeapi().
+ * Implements hook_nodeapi().
  */
 function gradebook_attachments_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
   if (in_array($node->type, (array)gradebookapi_get_assignment_types())) {
     switch ($op) {
       case 'load':
-        $additions=db_fetch_array(db_query('SELECT attach_status FROM {gradebookapi_assignment} WHERE nid=%d', $node->nid));
+        $additions = db_fetch_array(db_query('SELECT attach_status FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid));
         return $additions;
       case 'insert':
       case 'update':
-        db_query("UPDATE {gradebookapi_assignment} SET attach_status=%d WHERE nid=%d", $node->attach_status, $node->nid);
+        db_query("UPDATE {gradebookapi_assignment} SET attach_status = %d WHERE nid = %d", $node->attach_status, $node->nid);
         break;
       case 'delete':
         // Remove file attachments and delete any unused files.
@@ -267,7 +276,7 @@ function gradebook_attachments_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
 }
 
 /**
- * Implement hook_gradebook_grade_class().
+ * Implements hook_gradebook_grade_class().
  *  return a css class name to style the gradebook_grade_page when a gradebook entry has
  *  an attachment.
  */
@@ -276,7 +285,18 @@ function gradebook_attachments_gradebook_grade_class($nid, $uid) {
 }
 
 /**
- * Implement hook_gradebook_form_add_elements().
+ * Implements hook_gradebook_legend().
+ */
+
+function gradebook_attachments_gradebook_legend() {
+  $items = array(
+    'attachment' => array('item' => t('Attached File'), 'example' => '100'),
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_gradebook_form_add_elements().
  */
 function gradebook_attachments_gradebook_form_add_elements(&$form, &$form_state, $grades, $gradebook) {
   global $user;
@@ -305,21 +325,21 @@ function gradebook_attachments_gradebook_form_add_elements(&$form, &$form_state,
   }
   if ($attach_permission) {
     // Make sure necessary directories exist and are writable before displaying the attachment form.
-    $path = file_directory_path() .'/gradebook_attachments';
+    $path = file_directory_path() . '/gradebook_attachments';
     // Make sure the gradebook_attachments subdir exists.
     file_check_directory($path, FILE_CREATE_DIRECTORY);
     // Save files under gradebook tid directory.
-    $path .= '/'. $gradebook->tid;
+    $path .= '/' . $gradebook->tid;
     // Store path for later, when the file is saved.
     $form['new']['#gapath'] = $path;
     $temp = file_directory_temp();
     if (!file_check_directory($path, FILE_CREATE_DIRECTORY) || !file_check_directory($temp, FILE_CREATE_DIRECTORY)) {
       $form['new']['#description'] =  t('File attachments are disabled. The file directories have not been properly configured.');
       if (user_access('administer site configuration')) {
-        $form['new']['#description'] .= ' '. t('Please visit the <a href="@admin-file-system">file system configuration page</a>.', array('@admin-file-system' => url('admin/settings/file-system')));
+        $form['new']['#description'] .= ' ' . t('Please visit the <a href="@admin-file-system">file system configuration page</a>.', array('@admin-file-system' => url('admin/settings/file-system')));
       }
       else {
-        $form['new']['#description'] .= ' '. t('Please contact the site administrator.');
+        $form['new']['#description'] .= ' ' . t('Please contact the site administrator.');
       }
     }
     $limits = _upload_file_limits($user);
@@ -403,28 +423,27 @@ function gradebook_attachments_upload_form_attach_another($form, &$form_state) {
 }
 
 /**
- * Implement hook_gradebook_theme_add_content().
+ * Implements hook_gradebook_form_add_content().
  *
- *  Theme content added to the gradebook_grade_form
+ * Returns HTML attachment table in the gradebook grade form.
  *
- *  @param $position 
- *    A string indicating the location in the form to place the information
- *    possbilities supported by gradebookapi include 'title', 'note', and 'bottom'.
- *  @param $form
- *    The gradebook_grade_form passed by reference to allow drupal_render to work correctly
- *    note that this function should not be called by drupal api functions that do not
- *    support call by reference.
- *  @param $id
- *    The identification number for the grade to be themed.
+ * @param $position 
+ *   A string indicating the location in the form to place the information
+ *   possbilities supported by gradebookapi include 'title', 'note', and 'bottom'.
+ * @param $form
+ *   The gradebook_grade_form passed by reference to allow drupal_render to work correctly.
+ *   Note that this function should not be called by drupal api functions that do not
+ *   support call by reference.
+ * @param $id
+ *   The identification number for the grade to be themed.
  *
- *  @param $teacher
- *    TRUE if the user is a teacher associated with the gradebook, FALSE otherwise.
+ * @param $teacher
+ *   TRUE if the user is a teacher associated with the gradebook, FALSE otherwise.
  *
- *  @return $output 
- *    HTML to be added to the gradebook grade form.
+ * @return $output 
+ *   HTML to be added to the gradebook grade form.
  */
-function gradebook_attachments_gradebook_theme_add_content($position, &$form, $id, $teacher) {
-  $output = NULL;
+function gradebook_attachments_gradebook_form_add_content($position, &$form, $id, $teacher) {
   switch ($position) {
     case 'note':
       if (isset($form['grade'][$id]['attachments']['files'])) {
@@ -451,7 +470,7 @@ function gradebook_attachments_gradebook_theme_add_content($position, &$form, $i
         }
         $output = (count($attachment_rows) > 0) ? theme('table', $attachment_header, $attachment_rows) : '';
       }
-      break;
+    break;
     case 'bottom':
       $output =  drupal_render($form['new']['upload']) . drupal_render($form['new']['attach']);
       break;

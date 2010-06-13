@@ -7,9 +7,8 @@
  */
 
 /**
- * Implementation of hook_schema().
+ * Implements hook_schema().
  */
-
 function gradebook_attachments_schema() {
   // This was moved from gradebookapi.install
   // I would like to rename it, but don't see how to do this using the drupal 6 api.
@@ -34,22 +33,36 @@ function gradebook_attachments_schema() {
 }
 
 /**
- * Implementation of hook_install().
+ * Implements hook_schema_alter().
+ */
+function gradebook_attachments_schema_alter(&$schema) {
+  // Gradebook attachments adds these fields to the gradebookapi_assignment table.
+
+  $schema['gradebookapi_assignment']['fields']['attach_status'] = array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'not null' => FALSE,
+    'size' => 'tiny',
+  );
+}
+
+/**
+ * Implements hook_install().
  */
 
 function gradebook_attachments_install() {
   // Create tables.
   drupal_install_schema('gradebook_attachments');
 
-  // add field to gradebookapi_assignment to determine if attachments are allowed for a given assignment
+  // Add field to gradebookapi_assignment to indicate whether attachments are allowed for a given assignment.
   db_add_field($ret, 'gradebookapi_assignment', 'attach_status', array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'size' => 'tiny'));
-  // Insure that submodules have a greater weight than gradebookapi
+  // Ensure that submodules have a greater weight than gradebookapi.
   $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
   db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_attachments'", $weight + 1);
 }
 
 /**
- * Implementation of hook_uninstall().
+ * Implements hook_uninstall().
  */
 function gradebook_attachments_uninstall() {
 
@@ -73,16 +86,21 @@ function gradebook_attachments_uninstall() {
 
   // Delete all variables.
   db_query("DELETE FROM {variable} WHERE name LIKE 'gradebook_attachment%%'");
+
   return $ret;
 }
 
 function gradebook_attachments_update_6001() {
-  // Insure that submodules have a greater weight than gradebookapi
+  // Ensure that submodules have a greater weight than gradebookapi
   $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
   db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_attachments'", $weight + 1);
 }
 
 function gradebook_attachments_update_6002() {
-  // add field to gradebookapi_assignment to determine if attachments are allowed for a given assignment
+  $ret = array();
+
+  // Add field to gradebookapi_assignment to indicate whether attachments are allowed for a given assignment.
   db_add_field($ret, 'gradebookapi_assignment', 'attach_status', array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'size' => 'tiny'));
+
+  return $ret;
 }

@@ -7,19 +7,22 @@
  */
 
 /**
- *  Provide either an assignment summary (if $user is a student)
- *  or an edit form (if $user is a teacher)
+ * Menu callback provides either an assignment summary (if user is a student)
+ * or an edit form (if user is a teacher).
  *
- *  @param $gradebook
- *    the $gradebook object
- *  @param $uid
- *    path argument for student user id whose grade we want to edit/view
- *  @param $nid
- *    parth argument for the node id for the assignment we want to edit/view
+ * All users with 'access gradebook' permissions can view this page.
  *
+ * @param $gradebook
+ *   The $gradebook object.
+ * @param $uid
+ *   Path argument for student user id whose grade we want to edit/view.
+ * @param $nid
+ *   Path argument for the node id for the assignment we want to edit/view.
+ *
+ * @return
+ *   The grade edit or summary form.
  */
-
-function gradebook_grade_page($gradebook, $uid, $nid) {  //all users with 'access gradebook' permissions can view this page
+function gradebook_grade_page($gradebook, $uid, $nid) {
   $account = user_load(array('uid' => $uid));
 
   if ($account !== FALSE && gradebookapi_is_student($gradebook, $account)) {
@@ -35,16 +38,19 @@ function gradebook_grade_page($gradebook, $uid, $nid) {  //all users with 'acces
 }
 
 /**
- *  Enter grades for all students by assignment
- *    This form is only accessible to teachers
- *  @param $gradebook
- *    the $gradebook object
- *  @param $nid
- *    path argument for the node id for the assignment we want to edit/view
+ * Menu callback to enter grades for all students by assignment.
  *
+ *   This form is only accessible to teachers.
+ *
+ * @param $gradebook
+ *   The $gradebook object.
+ * @param $nid
+ *   Path argument for the node id for the assignment we want to edit/view.
+ *
+ * @return
+ *   The grade edit or summary form.
  */
-
-function gradebook_grade_assignment_page($gradebook, $nid) {  // only accessed by teacher
+function gradebook_grade_assignment_page($gradebook, $nid) {
   $types = gradebookapi_get_assignment_types();
   $node = node_load($nid);
   if (in_array($node->type, $types)) {
@@ -52,7 +58,7 @@ function gradebook_grade_assignment_page($gradebook, $nid) {  // only accessed b
     $students = array();
     $students = gradebookapi_get_students($gradebook);
     foreach ($students['uid'] as $uid) {
-      $grade = gradebookapi_get_grade($uid, $nid);  //now its safe to get $grade
+      $grade = gradebookapi_get_grade($uid, $nid);
       $grades[$uid] = (array)$grade;
     }
     return drupal_get_form('gradebook_grade_form', $gradebook, $grades);
@@ -60,6 +66,19 @@ function gradebook_grade_assignment_page($gradebook, $nid) {  // only accessed b
   drupal_not_found();
 }
 
+/**
+ * Menu callback to edit or provide a summary of student grades.
+ * 
+ * Access is limited to teacher through the menu system.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $uid
+ *   The user id.
+ *
+ * @return
+ *   The grade edit or summary form.
+ */
 function gradebook_grade_student_page($gradebook, $uid) {  // access is limited to teacher through menu system
   // get sort order for query
   $sort = (isset($_GET['sort']) && ($_GET['sort'] == 'asc')) ? 'desc' : 'asc';
@@ -80,25 +99,39 @@ function gradebook_grade_student_page($gradebook, $uid) {  // access is limited 
   drupal_not_found();
 }
 
+/**
+ * Form builder to edit a student grade.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $grades
+ *   An array of grade objects.
+ *
+ * @see gradebook_grade_form_validate()
+ * @see gradebook_grade_form_cancel()
+ * @see gradebook_grade_form_submit()
+ * @ingroup forms
+ */
 function gradebook_grade_form($form_state, $gradebook, $grades) {
   global $user;
   
   $teacher = gradebookapi_is_teacher($gradebook);
   $students = gradebookapi_get_students($gradebook);
-  $suid = array_flip($students['uid']); // this is needed because keys of $students is lost in module_invoke_all call
+  $suid = array_flip($students['uid']); // This is needed because keys of $students is lost in module_invoke_all call.
 
   $form = array('#theme' => 'gradebook_grade_form');
   $form['grade'] = array('#tree' => TRUE);
-  $form['#grades'] = $grades;  // make available for hook_form_alter
+  $form['#grades'] = $grades;  // Make grades available for hook_form_alter
   foreach ($grades as $id => $grade) {
-//    $account = user_load(array('uid' => $grade['uid']));
+  //    $account = user_load(array('uid' => $grade['uid']));
     $uid = $grade['uid'];
-    $display_name = $students['name'][$suid[$uid]];  // this is needed because module_invoke_all looses the keys
+    $display_name = $students['name'][$suid[$uid]];  // This is needed because module_invoke_all loses the keys.
 
+    // Make the node object available for hook_form_alter.
     $node = node_load($grade['nid']);
-    $form['grade'][$id]['#node'] = $node;  // make available for hook_form_alter
-    $form['grade'][$id]['uid'] = array('#type' => 'value', '#value' => $uid);  // must be '#type' => value
-    $form['grade'][$id]['nid'] = array('#type' => 'value', '#value' => $node->nid);     // must be '#type' => value
+    $form['grade'][$id]['#node'] = $node;
+    $form['grade'][$id]['uid'] = array('#type' => 'value', '#value' => $uid);  // must be '#type' => 'value'
+    $form['grade'][$id]['nid'] = array('#type' => 'value', '#value' => $node->nid); // must be '#type' => 'value'
     $form['grade'][$id]['user'] = array('#value' => $display_name);
     $form['grade'][$id]['node'] = array('#value' => $node->title);
     $form['grade'][$id]['#possible'] = $node->possible;
@@ -107,29 +140,31 @@ function gradebook_grade_form($form_state, $gradebook, $grades) {
     $form['grade'][$id]['#oldearned'] = $grade['earned'];
     $form['grade'][$id]['timestamp'] = array('#type' => 'value', '#value' => $grade['timestamp']);
 
-    if ($teacher) {  // display edit form
-      $form['grade'][$id]['earned'] = array('#type' => 'textfield', '#size' => 5, '#default_value' => $grade['earned'], '#field_suffix' => '/'. $node->possible);
-      $form['grade'][$id]['percentage'] = array('#type' => 'textfield', '#size' => 5, '#default_value' => $percentage, '#field_suffix' => '%');
+    if ($teacher) {
+      // Displays an edit form.
+      $form['grade'][$id]['earned'] = array('#type' => 'textfield', '#size' => 4, '#default_value' => $grade['earned'], '#field_suffix' => '/' . $node->possible);
+      $form['grade'][$id]['percentage'] = array('#type' => 'textfield', '#size' => 4, '#default_value' => $percentage, '#field_suffix' => '%');
       $form['grade'][$id]['exempt'] = array('#type' => 'checkbox', '#default_value' => $grade['exempt']);
       $form['grade'][$id]['note'] = array('#type' => 'textarea', '#cols' => 40, '#rows' => 6, '#default_value' => $grade['note']);
     }
-    else { // display grades without option for editing
+    else {
+      // Displays grades without an option for editing.
       if ($grade['earned'] != '') {
         $grade_mark = gradebookapi_load_marks($gradebook->tid, $node->nid, $percentage, FALSE);
         if (!$grade_mark) {
           $grade_mark = $grade['earned'];
-          $suffix =  '/'. $node->possible;
+          $suffix =  '/' . $node->possible;
         }
       $form['grade'][$id]['earned'] = array('#value' => $grade_mark, '#suffix' => $suffix);
       $form['grade'][$id]['percentage'] = array('#value' => $percentage, '#suffix' => '%');
       }
       $form['grade'][$id]['exempt'] = array('#type' => 'checkbox', '#value' => $grade['exempt'], '#disabled' => TRUE);
-      $form['grade'][$id]['note']   = array('#value' => $grade['note']);
+      $form['grade'][$id]['note'] = array('#value' => $grade['note']);
     }
   }
   $modules = module_implements('gradebook_form_add_elements');
   foreach ($modules as $module) {
-    $func = $module .'_gradebook_form_add_elements';
+    $func = $module . '_gradebook_form_add_elements';
     $func($form, $form_state, $grades, $gradebook);
   }
   $form['return_url'] = array('#type' => 'value', '#value' => 'gradebook/'. $gradebook->tid);
@@ -142,111 +177,157 @@ function gradebook_grade_form($form_state, $gradebook, $grades) {
   return $form;
 }
 
-/*
- * No validation is needed for floating point grades, but saving this function for future development.
- */
 function gradebook_grade_form_validate($form, &$form_state) {
-// do nothing
+  // No validation is needed for floating point grades, but saving this function for future development.
 }
 
 function gradebook_grade_form_cancel($form, &$form_state) {
-    unset($form_state['storage']);  // clear the storage bins now that files have been saved - needed for redirect
-    $form_state['redirect'] = $form_state['values']['return_url'];
-    unset($form_state['values']['return_url']);
+  // Clear the storage bins now that files have been saved - needed for redirect.
+  unset($form_state['storage']);
+  $form_state['redirect'] = $form_state['values']['return_url'];
+  unset($form_state['values']['return_url']);
 }
 
 function gradebook_grade_form_submit($form, &$form_state) {
-    $keys = array_keys($form_state['values']['grade']);
-    $count = 0;
-    foreach ($keys as $key) {
-      $grade = (object)$form_state['values']['grade'][$key];
-      if ($form_state['values']['teacher']) {
-        $node = node_load($form_state['values']['grade'][$key]['nid']);
-        $grade->due_date = $node->due_date;
-        $grade->publish_date = $node->publish_date;
-        $percentage = $form_state['values']['grade'][$key]['percentage'];
-        $earned = $form_state['values']['grade'][$key]['earned'];
-        if ($earned != $form['grade'][$key]['#oldearned']) {// use which one changed... if both changed, use points...
-          $grade->earned = $earned;
-        }
-        elseif ($percentage != $form['grade'][$key]['#oldpercentage']) {
-          $grade->earned = $percentage*$form['grade'][$key]['#possible']/100.0;
-        }
-        gradebookapi_set_grade($grade);
+  $keys = array_keys($form_state['values']['grade']);
+  $count = 0;
+  foreach ($keys as $key) {
+    $grade = (object)$form_state['values']['grade'][$key];
+    if ($form_state['values']['teacher']) {
+      $node = node_load($form_state['values']['grade'][$key]['nid']);
+      $grade->due_date = $node->due_date;
+      $grade->publish_date = $node->publish_date;
+      $percentage = $form_state['values']['grade'][$key]['percentage'];
+      $earned = $form_state['values']['grade'][$key]['earned'];
+      // Use whichever changed... if both changed, use points.
+      if ($earned != $form['grade'][$key]['#oldearned']) {
+        $grade->earned = $earned;
       }
-      else {
-        if ($grade->timestamp == 0) {  // grade doesn't exist in gradebookapi_grade, save a null grade
-          gradebookapi_set_grade($grade);
-        }
-        else { // grade already exists, but give other modules a chance to do something here.
-          module_invoke_all('gradebookapi_grade', 'set', $grade);
-        }
+      elseif ($percentage != $form['grade'][$key]['#oldpercentage']) {
+        $grade->earned = $percentage*$form['grade'][$key]['#possible']/100.0;
       }
-      ++$count;
-    }
-    unset($form_state['storage']);
-    if ($count >0) {
-      drupal_set_message(t('Saved %num %type.', array('%num' => $count, '%type' => t('grades'))));
+      gradebookapi_set_grade($grade);
     }
     else {
-      drupal_set_message(t('No changes were made to grades'));
+      if ($grade->timestamp == 0) {
+        // Grade doesn't exist in gradebookapi_grade, save a null grade.
+        gradebookapi_set_grade($grade);
+      }
+      else { // Grade already exists, but give other modules a chance to do something here.
+        module_invoke_all('gradebookapi_grade', 'set', $grade);
+      }
     }
-    $form_state['redirect'] = $form_state['values']['return_url'];
-    unset($form_state['values']['return_url']);
+    ++$count;
+  }
+  unset($form_state['storage']);
+  if ($count >0) {
+    drupal_set_message(t('Saved %num %type.', array('%num' => $count, '%type' => t('grades'))));
+  }
+  else {
+    drupal_set_message(t('No changes were made to grades'));
+  }
+  $form_state['redirect'] = $form_state['values']['return_url'];
+  unset($form_state['values']['return_url']);
 }
 
+/**
+ * Returns HTML to theme the grade form.
+ *
+ * @return
+ *   The HTML string ready to display.
+ *
+ * @ingroup themeable
+ */
 function theme_gradebook_grade_form($form) {
   global $user;
   $ids = element_children($form['grade']);
   $selectid = count($ids);
   $header = array();
+  // Don't show column heading unless there is more than one choice.
   if ($selectid > 1) {
-    $header = array('select' => t('Select'));  // don't show column heading unless there is more than one choice
+    $header = array('select' => t('Select'));
   }
   $header += array('name' => t('Name'), 'title' => t('Assignment Title'), 'grade' => t('Grade'), 'exempt' => t('Exempt'), 'note' => t('Note'));
   foreach ($ids as $id) {
     $row = NULL;
-    if  ($selectid > 1) {  // don't show radio button for a single entry
+    if  ($selectid > 1) {  // Don't show radio button for a single entry
       $row[] = array('data' => drupal_render($form['gradeid'][$id]), 'class' => 'select');
     }
     $row[] = array('data' => drupal_render($form['grade'][$id]['user']), 'class' => 'name');
     // allow modules to add information to the title block
+    $data = drupal_render($form['grade'][$id]['node']);
     $module_output = _gradebook_module_additions('title', $form, $id, $form['teacher']['#value'], '<br />');
-    $row[] = array('data' => drupal_render($form['grade'][$id]['node']) .'<br />'. $module_output, 'class' => 'title');
+    if ($module_output != '') {
+      $data .= '<br />' . $module_output;
+    }
+    $row[] = array('data' => $data , 'class' => 'title');
     if (isset($form['grade'][$id]['earned'])) {
-      $row[] = array('data' => drupal_render($form['grade'][$id]['earned']) .'<br />'. drupal_render($form['grade'][$id]['percentage']), 'class' => 'earned-possible');
+      $row[] = array('data' => drupal_render($form['grade'][$id]['earned']) . '<br />' . drupal_render($form['grade'][$id]['percentage']), 'class' => 'earned-possible');
     }
     else {
-      $row[] = array();
+      $row[] = array('data' => '&nbsp', 'class' => 'earned-possible');
     }
     $row[] = array('data' => drupal_render($form['grade'][$id]['exempt']), 'class' => 'exempt-box');
-    $output = '<div class="note">'. drupal_render($form['grade'][$id]['note']) .'</div>';
-    // give modules a chance to add output below the note block
-    // can't use module_invoke, module_invoke_all, or call_user_func, because these do not pass arguemtns by reference!
-
+    $output = '<div class = "note-region">' . drupal_render($form['grade'][$id]['note']) . '</div>';
+    // Give modules a chance to add output below the note block.
+    // Can't use module_invoke, module_invoke_all, or call_user_func, because these do not pass arguments by reference!
     $output .= _gradebook_module_additions('note', $form, $id, $form['teacher']['#value']);
-    $row[] = array('data' => $output);
-    $rows[] = array('data' => $row);
+    $row[] = array('data' => $output, 'class' => 'note');
+    $rows[$id] = array('data' => $row);
   }
-  $output = theme('table', $header, $rows, array('class' => 'gradebook'));
+  // Allow modules to adjust table,
+  $modules = module_implements('gradebook_adjust_grade_form_table');
+  $table = array('header' => $header, 'rows' => $rows);
+  foreach ($modules as $module) {
+    $func = $module . '_gradebook_adjust_grade_form_table';
+    $table = $func($form, $table);
+  }
+
+  $output = theme('table', $table['header'], $table['rows'], array('class' => 'gradebook'));
   $output .= theme('pager', NULL, variable_get('gradebook_grades_per_page', 10), 0);  // configure at admin screen!
-  $output .= '<div>'. _gradebook_module_additions('bottom', $form, -1, $form['teacher']['#value']) .'</div>';
-  $output .= '<div>'. drupal_render($form['submit']) . drupal_render($form['cancel']) .'</div>';
+  $output .= '<div>' . _gradebook_module_additions('bottom', $form, -1, $form['teacher']['#value']) . '</div>';
+  $output .= '<div>' . drupal_render($form['submit']) . drupal_render($form['cancel']) . '</div>';
   $output .= drupal_render($form);
   return $output;
 }
 
+/**
+ * Gathers HTML to add to the gradebook grade form from submodules
+ * hook_gradebook_form_add_content.
+ *
+ * @param $position
+ *   The position on the form to insert the content.
+ * @param $form
+ *   The form array, passed by reference.
+ * @param $teacher
+ *   TRUE if the current user is a teacher.
+ * @param $separator
+ *   HTML element to separate the content from each submodule.
+ *
+ * @return
+ *   HTML to add to the grade form.
+ */
 function _gradebook_module_additions($position, &$form, $id, $teacher, $separator = '') {
   $output = '';
-  $modules = module_implements('gradebook_theme_add_content');
+  $modules = module_implements('gradebook_form_add_content');
   foreach ($modules as $module) {
-    $func = $module .'_gradebook_theme_add_content';
-    $output .= $func($position, $form, $id, $teacher);  // need to pass by reference!
-    $output .= $separator;
+    $func = $module .'_gradebook_form_add_content';
+    $addition = $func($position, $form, $id, $teacher);  // need to pass by reference!
+    if ($addition != '') {
+      $output .= $addition;
+      $output .= $separator;
+    }
   }
   return $output;
 }
 
+/**
+ * Rebuilds the grades and returns the user to the gradebook page.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ *
+ */
 function gradebook_rebuild_page($gradebook) {
   gradebookapi_rebuild_grades($gradebook->tid);
   drupal_goto('gradebook/'. $gradebook->tid);

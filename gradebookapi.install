@@ -7,9 +7,8 @@
  */
 
 /**
- * Implementation of hook_schema().
+ * Implements hook_schema().
  */
-
 function gradebookapi_schema() {
   $schema['gradebookapi_assignment'] = array(
     'fields' => array(
@@ -64,7 +63,7 @@ function gradebookapi_schema() {
 }
 
 /**
- * Implementation of hook_install().
+ * Implements hook_install().
  */
 
 function gradebookapi_install() {
@@ -73,7 +72,7 @@ function gradebookapi_install() {
 }
 
 /**
- * Implementation of hook_uninstall().
+ * Implements hook_uninstall().
  */
 function gradebookapi_uninstall() {
 
@@ -111,8 +110,9 @@ function gradebookapi_update_6001() {
   return $ret;
 }
 
-// add a file id field for gradebook_grade table to allow file attachment to grade object
-
+/**
+ * Adds a file id field for gradebook_grade table to allow file attachment to grade object
+ */
 function gradebookapi_update_6002() {
   // add new table for gradebook file attachments
   $schema['gradebookapi_files'] = array(
@@ -121,7 +121,7 @@ function gradebookapi_update_6002() {
       'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'fid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE),
       'list'        => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny',
-                             'description' => t('Whether the file should be visibly listed on the grade note.'), ),
+                             'description' => 'Whether the file should be visibly listed on the grade note.', ),
       'description' => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
     ),
     'indexes' => array(
@@ -159,7 +159,6 @@ function gradebookapi_update_6004() {
   db_change_field($ret, 'gradebookapi_files', 'fid', 'fid', array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0));
   db_drop_primary_key($ret, 'gradebookapi_files');
   db_add_primary_key($ret, 'gradebookapi_files', array('fid', 'nid'));
+
   return $ret;
 }
-
-

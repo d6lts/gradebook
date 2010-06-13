@@ -1,0 +1,19 @@
+/* $Id$ */
+
+/**
+ * @file
+ * CSS rules for formating gradebook attachments
+ */
+
+/**
+ * Rules for formating gradebook table grade entries (and legend).
+ */
+
+.gradebook .grade.attachment,
+.gradebook .grade.attachment a,
+.gradebook-legend-item.attachment {
+  color: #FF0000;
+  text-align: center;
+  font-size: 130%;
+  font-weight: bold;
+}

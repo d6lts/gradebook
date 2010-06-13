@@ -7,7 +7,7 @@
  */
 
 /**
- * Implementation of hook_schema().
+ * Implements hook_schema().
  */
 
 function gradebook_scales_schema() {
@@ -56,21 +56,35 @@ function gradebook_scales_schema() {
 }
 
 /**
- * Implementation of hook_install().
+ * Implements hook_schema_alter().
+ */
+function gradebook_scales_schema_alter(&$schema) {
+  // Gradebook Scales adds the scale id field to the gradebookapi_assignment table.
+
+  $schema['gradebookapi_assignment']['fields']['sid'] = array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'not null' => FALSE,
+  );
+}
+
+/**
+ * Implements hook_install().
  */
 
 function gradebook_scales_install() {
   // Create tables.
+  $ret = array();
   drupal_install_schema('gradebook_scales');
   db_add_field($ret, 'gradebookapi_assignment', 'sid', array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE));
 
-  // Insure that submodules have a greater weight than gradebookapi
+  // Ensure that submodules have a greater weight than gradebookapi
   $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
   db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_scales'", $weight + 1);
 }
 
 /**
- * Implementation of hook_uninstall().
+ * Implements hook_uninstall().
  */
 function gradebook_scales_uninstall() {
 
@@ -85,8 +99,16 @@ function gradebook_scales_uninstall() {
   return $ret;
 }
 
+/**
+ * Implements hook_update_N().
+ */
 function gradebook_scales_update_6001() {
-  // Insure that submodules have a greater weight than gradebookapi
+  // Ensure that submodules have a greater weight than gradebookapi.
+  $ret = array();
+
   $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
-  db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_scales'", $weight + 1);
+  ++$weight;
+  $ret[] = update_sql("UPDATE {system} SET weight = $weight WHERE name = 'gradebook_scales'");
+
+  return $ret;
 }

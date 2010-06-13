@@ -1,5 +1,17 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2010-06-10
+----------------------
+
+#810058 by MGN: New feature provides redo status for graded assignments.
+#810046 by MGN: New feature allows teacher to limit number of responses per assignment.
+* by MGN: Implement hook_schema_alter when adding fields to tables owned by other gradebook modules.
+* by MGN: Added css files for gradebook submodules.
+* by MGN: Reworked css styling of gradebook, assignment, and response pages.
+* by MGN: New feature provides a gradebook legend block.
+* by MGN: More code cleanup to meet drupal coding standards.
+* by MGN: updated README.txt
+
 Gradebook 6.x.2.x-dev, 2010-06-01
 ----------------------
 #655636 by MGN: Improving views support for gradebook and its submodules.
