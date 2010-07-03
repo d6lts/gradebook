@@ -193,8 +193,12 @@ III. Usage (for students and teachers)
    gradebook page without saving.
 6. The teacher can also view or edit all grade information for a particular
    student by clicking on the student's name.  This link brings up a grade entry
-   form like that discussed in 5. Follow the
-   same procedures to update all grade data for the student.
+   form like that discussed in 5. Follow the same procedures to update all grade
+   data for the student.
+7. A themeable assignment notice is shown on assignment nodes when viewed by
+   students and teachers of the class. The style of this notice can be adjusted
+   by modifying the gradebook.css stylesheet. The content can also be modified
+   (or eliminated) using a theme override.
 
 IV. Description of Optional Submodules
 --------------------------------------
@@ -280,7 +284,13 @@ IV. Description of Optional Submodules
        change the response status to REDO for each response submitted for the
        assignment. Unchecking the redo permitted box and submitting a grade will
        return the response status to graded.
-    G. Grades with responses are emphasized on the gradebook page using a css
+    G. Restrictions can be placed on student rattachments. The default behavior
+       is not to allow students to respond to an assignment after the due date.
+       This default behavior can be changed for an individual gradebook through
+       the settings tab on the gradebook page. Teachers can also override this
+       default behavior for individual assignments by setting the response
+       restrictions on the node edit page when creating assignments.
+    H. Grades with responses are emphasized on the gradebook page using a css
        style. The default emphasis can be adjusted by overriding or editing the
        gradebook_responses.css file.
 
@@ -341,6 +351,40 @@ IV. Description of Optional Submodules
     C. Users can be assigned role of teacher, student or grading assistant.
        i. Grading assistants can do everything a teacher can do, except they
           cannot modify the roster.
+
+4.  Gradebook Attendance provides a means for recording student attendance and
+    provides an attendance page that is similar to the gradebook page. When this
+    module is enabled, students and teachers will have an Attendance tab when
+    viewing the gradebook page. Clicking on this tab will take them to the
+    attendance page. Student's will only see their own attendance records.
+    Teachers will see the records for the entire class and will be able to edit
+    or create new attendance records. Also, if attendance has not already
+    been recorded "Take Today's Attendance" reminder link will appear above the
+    gradebook page that will take the teacher to a form where they can record
+    attendance.
+    A. The teacher can choose to give a student one of three marks: Present,
+       Absent, or Tardy.
+    B. Attendance records are limited to one per gradebook per calendar day.
+    C. Attendance records for the entire class can be edited or deleted by
+       following the "edit" or "delete" links on the gradebook attendance page.
+    D. An individual student's attendance record can be changed for a given day
+       by clicking on the attendance record for that day.
+    E. An individual student's entire attendance record can be edited by
+       clicking on the student's name on the attendance page.
+    F. The attendance page can be exported to ascii text or Excel spreadsheet
+       through the Export tab on the gradebook page.
+    G. Teacher's can create an attendance assignment that will provide points
+       for student's attendance when attendance is taken over a range of dates.
+       This is done by checking the "attendance assignment" box on the form when
+       creating an assignment. If this box is checked, then the points specified
+       in the "Points if Present, Absent and Tardy" fields will be given
+       whenever attendance is taken between the publish and due dates for the
+       attendance assignment. Grading is automatic. The grades are also updated
+       if the assignment is modified. A special (themeable) notice is also shown
+       on the assignment node explaining how attendance is graded.
+    H. Attendance records are emphasized on the attendance page using a css
+       style. The default emphasis can be adjusted by overriding or editing the
+       gradebook_attendance.css file.
 
 V. Developer notes
 ------------------

@@ -903,6 +903,10 @@ function theme_gradebook_export_page($gradebook, $assignments, $students, $stude
     $grade = gradebookapi_get_term_grade($uid, $gradebook->tid);
     $row[] = theme('gradebook_term_grade', $gradebook, $grade, TRUE);
     foreach ($assignments as $assignment) {
+      if (!isset($sum[$assignment->nid])) {
+        $sum[$assignment->nid] = 0;
+        $sum_possible[$assignment->nid] = 0;
+      }
       $grade = $grades[$assignment->nid];
       $row[] = theme('gradebook_assignment_grade', $gradebook, $grade, TRUE);
       if ((!isset($grade->exempt) || $grade->exempt == FALSE) && isset($grade->earned)) {

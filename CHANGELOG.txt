@@ -4,6 +4,9 @@ Gradebook 6.x.2.x-dev, 2010-07-03
 ----------------------
 #403072 by jdwfly and MGN: Added gradebook_attendance submodule.
 #834654 by MGN: New feature provides option to allow reponses to assignments after the deadline.
+* by MGN: Fixed E_NOTICE warnings.
+* by MGN: Updated README.txt.
+* by MGN: Fixed assignment notices so they are seen by both students and teachers.
 
 Gradebook 6.x.2.x-dev, 2010-06-10
 ----------------------

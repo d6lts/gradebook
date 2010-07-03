@@ -51,7 +51,7 @@ function gradebook_download_form(&$form_state, $gradebook) {
     '#type' => 'submit',
     '#value' => t('Download'),
   );
-  $form['#gradebook_page'] = $gradebook_page;
+
   return $form;
 }
 
@@ -91,8 +91,8 @@ function gradebook_download($gradebook, $gradebook_page, $format = 'delimiter', 
 
   // Open a new Gradebook exporter object.
   $exporter = gradebook_export_create_handler($format, $options);
-
-  $file_name = tempnam(variable_get('file_directory_temp', FILE_DIRECTORY_TEMP), 'gradebook');
+  $temp = file_directory_temp();
+  $file_name = tempnam($temp, 'gradebook');
   $handle = @fopen($file_name, 'w'); // The @ suppresses errors.
   $exporter->bof($handle);
   $header = array();

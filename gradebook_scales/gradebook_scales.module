@@ -430,13 +430,13 @@ function gradebook_scales_gradebookapi_marks($gid, $aid = -1, $gradepoints, $ref
     }
   }  
   else {
-    if (!is_array($data[$gid])){
+    if (!isset($data[$gid]) || !is_array($data[$gid])) {
       $data[$gid] = array();
     }
-    if (!is_array($data[$gid][$aid])){
+    if (!isset($data[$gid][$aid]) || !is_array($data[$gid][$aid])) {
       $data[$gid][$aid] = array();
     }
-    if (empty($data[$gid][$aid])) { //retrieve scale data for this assignment 
+    if (empty($data[$gid][$aid])) { //retrieve scale data for this assignment
       $sid = db_result(db_query('SELECT sid from {gradebookapi_assignment} WHERE nid = %d', $aid));
       if (is_null($sid) || $sid == 0) {
         $data[$gid][$aid] = array( 'has_scale' => FALSE);

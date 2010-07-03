@@ -778,7 +778,7 @@ function theme_gradebookapi_assignment_notice($node) {
   foreach ($terms as $term) {
     // Retrieves the gradebook for this term and checks to see if the user in the gradebook.
     $gradebook = gradebookapi_get_tid_gradebook($term->tid);
-    if (gradebookapi_is_student($gradebook, $account) && ($term->tid != $gradebook->tid)) {
+    if (gradebookapi_is_student_or_teacher($gradebook, $account) && ($term->tid != $gradebook->tid)) {
       $gnames[$term->tid] = $gradebook->name;
       $categories[$term->tid] = $term->name;
     }
