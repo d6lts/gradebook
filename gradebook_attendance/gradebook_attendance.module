@@ -1168,7 +1168,6 @@ function theme_gradebook_attendance_totals($totals, $export = FALSE) {
  *    The HTML string ready to display
  */
 function theme_gradebook_attendance_assignment_notice($node) {
-  drupal_set_message("assignment notice");
   if ($node->attendance_assignment == 1) {
     global $user;
     $account = user_load(array('uid' => $user->uid));

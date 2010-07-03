@@ -49,6 +49,13 @@ function gradebook_responses_schema_alter(&$schema) {
     'default' => 0,
   );
 
+  $schema['gradebookapi_assignment']['fields']['response_deadline'] = array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'not null' => FALSE,
+    'size' => 'tiny',
+  );
+
 // Gradebook Responses adds this field to the gradebookapi_grade table.
 
   $schema['gradebookapi_grade']['fields']['redo'] = array(
@@ -70,6 +77,7 @@ function gradebook_responses_install() {
   // Add new fields to the gradebookapi_assignment database table.
   db_add_field($ret, 'gradebookapi_assignment', 'response_types', array('type' => 'varchar', 'length' => 255, 'not null' => FALSE, 'description' => "A comma delimited list of allowed response types for this assignment."));
   db_add_field($ret, 'gradebookapi_assignment', 'max_responses', array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0));
+  db_add_field($ret, 'gradebookapi_assignment', 'response_deadline', array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'size' => 'tiny'));
   // Add new fields to the gradebookapi_grade database table.
   db_add_field($ret, 'gradebookapi_grade', 'redo', array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'size' => 'tiny', 'default' => 0));
   // Ensure that submodules have a greater weight than gradebookapi.
@@ -81,6 +89,14 @@ function gradebook_responses_install() {
  * Implements hook_uninstall().
  */
 function gradebook_responses_uninstall() {
+
+  // Remove added fields
+  $ret = array();
+  db_drop_field($ret, 'gradebookapi_assignment', 'response_types');
+  db_drop_field($ret, 'gradebookapi_assignment', 'max_responses');
+  db_drop_field($ret, 'gradebookapi_assignment', 'response_deadline');
+  db_drop_field($ret, 'gradebookapi_grade', 'redo');
+
   // Remove tables.
   drupal_uninstall_schema('gradebook_responses');
 }
@@ -124,6 +140,18 @@ function gradebook_responses_update_6202() {
 function gradebook_responses_update_6203() {
   $ret = array();
 db_add_field($ret, 'gradebookapi_grade', 'redo', array('type' => 'int', 'unsigned' => FALSE, 'not null' => TRUE, 'size' => 'tiny', 'default' => 0));
+
+  return $ret;
+}
+
+/**
+ * Adds the response_deadline field to the gradebookapi_grade database table.
+ */
+function gradebook_responses_update_6204() {
+  $ret = array();
+
+  // Add field to gradebookapi_assignment to indicate whether postdeadline responses are allowed for a given assignment.
+  db_add_field($ret, 'gradebookapi_assignment', 'response_deadline', array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'size' => 'tiny'));
 
   return $ret;
 }

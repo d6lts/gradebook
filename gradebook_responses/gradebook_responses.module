@@ -47,7 +47,7 @@ function gradebook_responses_link($type, $node = NULL, $teaser = FALSE) {
   $links = array();
   $aid = $node->nid;
   $assignment_types = gradebookapi_get_assignment_types();
-  if (isset($assignment_types[$node->type]) && gradebook_responses_user_response_permitted($aid)) {
+  if (isset($assignment_types[$node->type]) && gradebook_responses_user_response_permitted($aid) && ($node->response_deadline == 1 || (time() < $node->due_date))) {
     $terms = gradebookapi_assignment_terms($node);
     $gids = array();
     foreach ($terms as $term) { 
@@ -431,22 +431,24 @@ function gradebook_responses_form_elements($node) {
           $allowed = gradebook_responses_allowed_response_types($assignment->nid);
           if (in_array($node->type, $allowed) && gradebook_responses_user_response_permitted($assignment->nid, $account->uid)) {
             $assignment = node_load($assignment->nid);
-            if ($assignment->max_responses == 0) {
+            if ($assignment->response_deadline == 1 || (time() < $assignment->due_date)) {
+              if ($assignment->max_responses == 0) {
               $remaining_text = t('Unlimited');
-            }
-            else {
-              $count = gradebook_responses_grade_response_number($assignment->nid, $account->uid);
-              $remaining = $assignment->max_responses - $count;
-              $remaining_text = format_plural($remaining, '1 response', '@count responses') . ' ' . t('remaining');
-            }
-            $grade_result = db_fetch_array(db_query('SELECT earned, redo FROM {gradebookapi_grade} WHERE uid = %d and nid = %d', $account->uid, $assignment->nid));
-            if (is_null($grade_result['earned']) || $grade_result['earned'] == '' || $locked && ($remaining > 0)) {
-              // The assignment has not been graded, so add it to the options array.
-              $options[$assignment->nid] = $assignment->title . '(' . $remaining_text . ')';
-            } 
-            else {
-              if ($grade_result['redo']) {
-                $options[$assignment->nid] = t('Redo of') . ' ' . $assignment->title;
+              }
+              else {
+                $count = gradebook_responses_grade_response_number($assignment->nid, $account->uid);
+                $remaining = $assignment->max_responses - $count;
+                $remaining_text = format_plural($remaining, '1 response', '@count responses') . ' ' . t('remaining');
+              }
+              $grade_result = db_fetch_array(db_query('SELECT earned, redo FROM {gradebookapi_grade} WHERE uid = %d and nid = %d', $account->uid, $assignment->nid));
+              if (is_null($grade_result['earned']) || $grade_result['earned'] == '' || $locked && ($remaining > 0)) {
+                // The assignment has not been graded, so add it to the options array.
+                $options[$assignment->nid] = $assignment->title . '(' . $remaining_text . ')';
+              } 
+              else {
+                if ($grade_result['redo']) {
+                  $options[$assignment->nid] = t('Redo of') . ' ' . $assignment->title;
+                }
               }
             }
           }
@@ -535,6 +537,14 @@ function gradebook_responses_assignment_form_elements($node) {
     '#weight'        => 12,
   );
 
+  $form['response_deadline'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Allow responses after the assignment due date.'),
+    '#default_value' => (isset($node->response_deadline) ? $node->response_deadline : 0),
+    '#required' => TRUE,
+    '#weight' => 13,
+  );
+
   return $form;
 }
 
@@ -551,6 +561,20 @@ function gradebook_responses_form_alter(&$form, $form_state, $form_id) {
       '#options'       => array_map('check_plain', node_get_types('names')),
       '#description'   => t('A list of node types you want to treat as student responses.'),
       '#weight'        => -9,
+    );
+  }
+  if ($form_id == 'gradebook_teacher_settings') {
+    // Add options to the local gradebook settings form.
+    $gid = $form['#gid'];
+
+    $default = variable_get('gradebook_responses_settings-' . $gid, 0);
+
+    $form['local']['gradebook_responses_settings-'. $gid] = array(
+      '#title' => t('Allow student responses after the assignment due date.'),
+      '#type' => 'checkbox',
+      '#default_value' => $default,
+      '#description' => t('Enable this option to allow students to submit responses after the assignment due date. If disabled, student responses will not be accepted after the due date. Note that you an override this default behavior for individual assignments when creating or editing the assignment.'),
+      '#required' => TRUE,
     );
   }
   if (isset($form['type']) && $form['type']['#value'] . '_node_form' == $form_id) {
@@ -599,7 +623,12 @@ function gradebook_responses_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) 
           // Retrieves an array of allowed response types for this node.
           $allowed = gradebook_responses_allowed_response_types($node->nid);
           $max_responses = gradebook_responses_assignment_max_responses($node->nid);
-          $additions = array('allowed_response_types' => $allowed, 'max_responses' => $max_responses);
+          $deadline = db_result(db_query('SELECT response_deadline FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid));
+          $additions = array(
+            'allowed_response_types' => $allowed,
+            'max_responses' => $max_responses,
+            'response_deadline' => $deadline,
+          );
           return $additions;
         case 'insert':
         case 'update':
@@ -612,6 +641,7 @@ function gradebook_responses_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) 
           else {
             db_query("UPDATE {gradebookapi_assignment} SET response_types = NULL, max_responses = 0 WHERE nid = %d", $node->nid);
           }
+          db_query("UPDATE {gradebookapi_assignment} SET response_deadline = %d WHERE nid = %d", $node->response_deadline, $node->nid);
           break;
         case 'view':
           if (isset($node->max_responses)) {
