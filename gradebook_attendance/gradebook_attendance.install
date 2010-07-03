@@ -20,7 +20,7 @@ function gradebook_attendance_schema() {
     'indexes' => array(
       'astatus' => array('astatus'),
     ),
-    'primary key' => array('uid', 'gid', 'date'),
+    'primary key' => array('uid', 'gid', 'adate'),
   );
   $schema['gradebook_attendance_assignment'] = array(
     'fields' => array(
