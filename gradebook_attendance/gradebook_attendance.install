@@ -1,0 +1,63 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * gradebook_attendance.install: Install schema for gradebook_attendance
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function gradebook_attendance_schema() {
+  $schema['gradebook_attendance'] = array(
+    'fields' => array(
+      'uid'          => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'gid'          => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'adate'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'astatus'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+    ),
+    'indexes' => array(
+      'astatus' => array('astatus'),
+    ),
+    'primary key' => array('uid', 'gid', 'date'),
+  );
+  $schema['gradebook_attendance_assignment'] = array(
+    'fields' => array(
+      'aid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'attendance_assignment' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'size' => 'tiny', 'default' => 0),
+      'grade_present' => array('type' => 'float', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
+      'grade_absent' => array('type' => 'float', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
+      'grade_tardy' => array('type' => 'float', 'unsigned' => FALSE, 'not null' => TRUE, 'default' => 0),
+    ),
+    'indexes' => array(
+      'attendance_assignment' => array('attendance_assignment'),
+      'grade_present' => array('grade_present'),
+      'grade_absent' => array('grade_absent'),
+      'grade_tardy' => array('grade_tardy'),
+    ),
+    'primary key' => array('aid'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function gradebook_attendance_install() {
+  // Create tables.
+  drupal_install_schema('gradebook_attendance');
+
+  // Ensure that submodules have a greater weight than gradebookapi.
+  $weight = (int) db_result(db_query("SELECT weight FROM {system} WHERE name = 'gradebookapi'"));
+  db_query("UPDATE {system} SET weight = %d WHERE name = 'gradebook_attendance'", $weight + 1);
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function gradebook_attendance_uninstall() {
+  // Remove tables.
+  drupal_uninstall_schema('gradebook_attendance');
+}

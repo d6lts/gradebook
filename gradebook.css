@@ -37,7 +37,7 @@
 
 #gradebook-grade-page-links li {
   display: inline;
-  padding: 0;
+  padding-right: 10px;
 }
 
 /**

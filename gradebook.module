@@ -1247,3 +1247,10 @@ function gradebook_gradebook_legend() {
   );
   return $items;
 }
+
+/**
+ * Implements hook_gradebook_export().
+ */
+function gradebook_gradebook_export() {
+  return array('gradebook_gradebook_page' => t('Gradebook Page'));
+}

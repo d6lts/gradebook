@@ -1,0 +1,135 @@
+/* $Id$ */
+
+/**
+ * @file
+ * CSS rules for formating the gradebook
+ */
+
+/**
+ *  This container surrounds the gradebook_page.
+ *  Adds scrollbars to keep table under control.
+ */
+
+#gradebook-attendance-container {
+  overflow-x: scroll;
+  overflow-y: scroll;
+}
+
+/**
+ *  Style the links above the gradebook grade page.
+ *  Each link is an item in an unordered list.
+ */
+
+#gradebook-attendance-page-links {
+  background-color: #c0c0c0;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  padding-left: 10px;
+  margin-bottom: 10px;
+  font-size: 100%;
+  list-style-type: circle;
+}
+
+#gradebook-attendance-page-links ul {
+  margin: 0;
+  padding: 0;
+}
+
+#gradebook-attendance-page-links li {
+  display: inline;
+  padding-right: 10px;
+}
+
+/**
+ *  Rules to format the gradebook attendance table 
+ */
+
+.gradebook-attendance-table {
+  width: 100%;
+  font-size: 80%;
+  border: 1px solid #ccc;
+}
+
+/**
+ *  Rules for formatting gradebook table header rows and columns
+ */
+.gradebook-attendance-table td,
+.gradebook-attendance-table th
+{
+  text-align: center;
+}
+
+.gradebook-attendance-table .gradebook-attendance-delete,
+.gradebook-attendance-table .gradebook-attendance-edit
+{
+  text-align: center;
+}
+
+.gradebook-attendance-table .gradebook-attendance-totals {
+  color:#FF0000;
+}
+
+.gradebook-attendance-table .gradebook-attendance-tardy {
+  background-color:#FFFF00;
+}
+
+.gradebook-attendance-table .gradebook-attendance-present {
+  background-color:#00FF00;
+}
+
+.gradebook-attendance-table .gradebook-attendance-absent {
+  background-color:#FF66FF;
+}
+
+/**
+ *  Rules for formatting attendance table (student view)
+ */
+
+.gradebook-attendance-student-table {
+  width: 50%;
+  font-size: 100%;
+  border: 1px solid #ccc;
+  text-align: center;
+}
+
+.gradebook-attendance-student-table th
+{
+  text-align: center;
+}
+
+.gradebook-attendance-student-table .gradebook-attendance-student-name {
+  font-weight: bold;
+}
+
+.gradebook-attendance-student-table .gradebook-attendance-student-summary {
+}
+
+.gradebook-attendance-student-table .gradebook-attendance-student-present {
+  background-color:#00FF00;
+}
+
+.gradebook-attendance-student-table .gradebook-attendance-student-absent {
+  background-color:#FF66FF;
+}
+
+.gradebook-attendance-student-table .gradebook-attendance-student-tardy {
+  background-color:#FFFF00;
+}
+
+/**
+ *  Rules to format the extra fields added to assignment nodes.
+ */
+
+.gradebook-attendance-assignment-notice {
+  border:.75pt solid #317082;;
+  border-left-width: 5px;
+  vertical-align: top;
+  background: #e2ebed;
+  color: #027ac6;
+  padding: 10px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  margin-right: auto;
+  margin-left: auto;
+  text-align: left;
+}

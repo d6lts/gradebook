@@ -1,0 +1,8 @@
+; $Id$
+name = Gradebook Attendance
+description = Allows users to take attendance with their gradebooks.
+core = 6.x
+package = Gradebook
+dependencies[] = gradebook
+dependencies[] = gradebookapi
+php = 5.2

@@ -1,0 +1,1203 @@
+<?php
+// $Id$
+/**
+ * @file
+ * Lets users take attendance for each gradebook they have
+ */
+
+/**
+ * Defines constants used by gradebook_attendance
+ */
+define('GRADEBOOK_ATTENDANCE_PRESENT', 1);
+define('GRADEBOOK_ATTENDANCE_ABSENT', 2);
+define('GRADEBOOK_ATTENDANCE_TARDY', 3);
+
+/**
+ * Implements hook_init().
+ */
+function gradebook_attendance_init() {
+  // Add the CSS for this module.
+  drupal_add_css(drupal_get_path('module', 'gradebook_attendance') . '/gradebook_attendance.css');
+}
+
+/**
+ * Implements hook_theme().
+ */
+function gradebook_attendance_theme() {
+  return array(
+    'gradebook_attendance_form' => array('arguments' => array()),
+    'gradebook_attendance_student_form' => array('arguments' => array()),
+    'gradebook_attendance_student_page' => array('arguments' => array('gradebook', 'timestamps', 'attendance', 'student')),
+    'gradebook_attendance_teacher_page' => array('arguments' => array('gradebook', 'timestamps', 'attendance', 'students')),
+    'gradebook_attendance_export_page' => array('arguments' => array('gradebook', 'timestamps', 'attendance', 'students')),
+    'gradebook_attendance_status' => array('arguments' => array('astatus', 'path')),
+    'gradebook_attendance_totals' => array('arguments' => array('totals')),
+    'gradebook_attendance_assignment_notice' => array('arguments' => array('node')),
+  );
+}
+
+/**
+ * Implements hook_help().
+ */
+function gradebook_attendance_help($path, $arg) {
+  if ($path == 'admin/help#gradebook_attendance') {
+    return '<p>' . t('The Gradebook Attendance sub-module allows the user to take attendance for each gradebook they have. This module needs the Gradebook, Gradebook API and taxonomy modules enabled') . '</p>';
+  }
+}
+
+/**
+ * Implements hook_gradebook_grade_page_links().
+ */
+function gradebook_attendance_gradebook_grade_page_links($gradebook) {
+  $links = array();
+  if (!gradebook_attendance_today($gradebook->tid)) {
+    if (gradebookapi_is_teacher($gradebook)) {
+      $links[] = l("Take Today's Attendance", 'gradebook/' . $gradebook->tid . '/attendance/edit');
+    }
+  }
+  return $links;
+}
+
+/**
+ * Checks to see if attendance has been taken.
+ *
+ * @param $gid
+ *   The term id for the gradebook.
+ * @param $timestamp
+ *   The timestamp to query for (Defaults to today).
+ *
+ * @return
+ *   TRUE if attendance has been taken, FALSE otherwise.
+ */
+function gradebook_attendance_today($gid, $timestamp = 0) {
+  if ($timestamp == 0) {
+    $timestamp = mktime(0, 0, 0, date("m"), date("d"), date("Y"));
+  }
+
+  $result = db_result(db_query("SELECT COUNT(uid) FROM {gradebook_attendance} WHERE gid = %d AND adate = %d", $gid, $timestamp));
+  return ($result > 0);
+}
+
+/**
+ * Implements hook_gradebook_attendance_page_links().
+ */
+function gradebook_attendance_gradebook_attendance_page_links($gradebook) {
+  $links = array();
+  if (gradebookapi_is_teacher($gradebook)) {
+    $link = gradebook_attendance_gradebook_grade_page_links($gradebook);
+    if (count($link) > 1) {
+      $links[] = array_shift($link);
+    }
+    $links[] = l('Record Attendance', 'gradebook/' . $gradebook->tid . '/attendance/edit');
+  }
+  return $links;
+}
+
+/**
+ * Provides a summary of a student's attendance record for a specified range of dates.
+ *
+ * @param $gid
+ *   The term id for the gradebook.
+ * @param $uid
+ *   The user id.
+ * @param $start
+ *   The starting date for the summary.
+ * @param $stop
+ *   The ending date for the summary.
+ */
+function gradebook_attendance_attendance_summary($gid, $uid, $start, $stop) {
+ $num = array(GRADEBOOK_ATTENDANCE_PRESENT => 0, GRADEBOOK_ATTENDANCE_ABSENT => 0, GRADEBOOK_ATTENDANCE_TARDY => 0);
+ $result = db_query("SELECT astatus FROM {gradebook_attendance} WHERE gid = %d AND uid = %d AND adate >= %d AND adate <= %d", $gid, $uid, $start, $stop);
+ while ($value = db_result($result)) {
+   ++$num[$value];
+ }
+ return array('present' => $num[GRADEBOOK_ATTENDANCE_PRESENT],
+              'absent' => $num[GRADEBOOK_ATTENDANCE_ABSENT],
+              'tardy' => $num[GRADEBOOK_ATTENDANCE_TARDY]);
+}
+
+/**
+ * Implements hook_menu().
+ */
+function gradebook_attendance_menu() {
+  $items = array();
+
+  $items['gradebook/%gradebookapi_gradebook/attendance'] = array(
+    'title' => 'Attendance',
+    'page callback' => 'gradebook_attendance_page',
+    'page arguments' => array(1),
+    'access callback' => 'gradebookapi_is_student_or_teacher',
+    'access arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  $items['gradebook/%gradebookapi_gradebook/attendance/edit'] = array(
+    'title' => 'Take Attendance',
+    'page callback' => 'gradebook_attendance_edit_page',
+    'page arguments' => array(1),
+    'access callback' => 'gradebookapi_is_teacher',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['gradebook/%gradebookapi_gradebook/attendance/edit/%'] = array(
+    'title' => 'Edit Attendance Record',
+    'page callback' => 'gradebook_attendance_edit_page',
+    'page arguments' => array(1, 4),
+    'access callback' => 'gradebookapi_is_teacher',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['gradebook/%gradebookapi_gradebook/attendance/edit-all/%'] = array(
+    'title' => 'Edit Attendance Record',
+    'page callback' => 'gradebook_attendance_student_page',
+    'page arguments' => array(1, 4),
+    'access callback' => 'gradebookapi_is_teacher',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['gradebook/%gradebookapi_gradebook/attendance/delete/%'] = array(
+    'title' => 'Delete Attendance Record',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('gradebook_attendance_confirm_delete', 1, 4),
+    'access callback' => 'gradebookapi_is_teacher',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['gradebook/%gradebookapi_gradebook/attendance/export'] = array(
+    'title' => 'Export',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('gradebook_download_form', 1, 'gradebook_attendance_page'),
+    'access callback' => 'gradebookapi_is_teacher',
+    'access arguments' => array(1),
+    'file' => 'gradebook_report.inc',
+    'file path' => drupal_get_path('module', 'gradebook'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Menu callback to create or edit an attendance record for a class or individual student.
+ *
+ * Access is limited to teacher through the menu system.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $timestamp
+ *   The timetamp for the day attendance is recorded.
+ * @param $uid
+ *   The user id.
+ *
+ * @return
+ *   The attendance edit form.
+ *
+ * @see gradebook_attendance_form()
+ * @see gradebook_attendance_student_form()
+ */
+function gradebook_attendance_edit_page($gradebook, $timestamp = NULL, $uid = NULL) {
+  $students = gradebookapi_get_students($gradebook);
+
+  if (isset($uid) && in_array($uid, $students['uid'])) {
+    $names = array($uid => $students['name'][$uid]);
+    $uids = array($uid => $uid);
+  }
+  else {
+    $names = $students['name'];
+    $uids = $students['uid'];
+  }
+
+  if (is_null($timestamp) && is_null($uid)) {
+    // If timestamp and uid are not provided - take attendence for the class.
+    return drupal_get_form('gradebook_attendance_form', $gradebook, $names);
+  }
+  
+  if (is_null($timestamp)) {
+    $timestamp = mktime(0, 0, 0, date("m"), date("d"), date("Y"));
+  }
+  $args = array_merge(array($gradebook->tid, $timestamp), $uids);
+
+  $result = db_query("SELECT * FROM {gradebook_attendance} WHERE gid = %d AND adate = %d AND uid IN (" . db_placeholders($uids, 'int') . ") ORDER BY uid ASC", $args);
+  $attendance = array();
+  while ($record = db_fetch_array($result)) {
+    $attendance[$record['uid']] = $record;
+  }
+  return drupal_get_form('gradebook_attendance_form', $gradebook, $names, $attendance, $timestamp);
+}
+
+/**
+ * Menu callback to edit a student's attendance record.
+ *
+ * Access is limited to teacher through the menu system.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $uid
+ *   The user id.
+ *
+ * @return
+ *   The attendance edit form.
+ *
+ * @see gradebook_attendance_form()
+ * @see gradebook_attendance_student_form()
+ */
+function gradebook_attendance_student_page($gradebook, $uid = NULL) {
+  $students = gradebookapi_get_students($gradebook);
+
+  if (isset($uid) && in_array($uid, $students['uid'])) {
+    $names = array($uid => $students['name'][$uid]);
+    $uids = array($uid => $uid);
+  }
+  else {
+    // What should be done if the requested uid is not in the gradebook?
+    // Provide an error message , or just return to the attendance page?
+    drupal_not_found();
+  }
+
+  if (is_null($uid)) {
+    return drupal_get_form('gradebook_attendance_form', $gradebook, $names);
+  }
+
+  $result = db_query("SELECT * FROM {gradebook_attendance} WHERE gid = %d AND uid = %d ORDER BY adate ASC", $gradebook->tid, $uid);
+  $attendance = array();
+  while ($record = db_fetch_array($result)) {
+    $attendance[$record['adate']] = $record;
+  }
+  return drupal_get_form('gradebook_attendance_student_form', $gradebook, $names, $attendance);
+}
+
+/**
+ * Form builder to edit the class attendance record.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $names
+ *   An array of array of student names, indexed by user id.
+ * @param $attendance
+ *   An array of attendendance records, indexed by timestamp.
+ * @param $timestamp
+ *   The timetamp for the day attendance is recorded.
+ *
+ * @see gradebook_attendance_form_submit()
+ * @see gradebook_attendance_form_cancel()
+ * @see theme_gradebook_attendance_form()
+ * @ingroup forms
+ */
+function gradebook_attendance_form($form_state, $gradebook, $names, $attendance = NULL, $timestamp = 0) {
+  module_load_include('inc', 'gradebook', 'gradebook.datetime');
+  $datetype = _gradebookapi_usedateapi() ? 'date_popup': 'date';
+
+  if ($datetype == 'date_popup') {
+    $default = ($timestamp == 0) ? 'now' : _gradebookapi_unixtime2datepopup($timestamp);
+  }
+  else {
+    $default = ($timestamp == 0) ? NULL : _gradebookapi_unixtime2drupaldate($timestamp);
+  }
+
+  $form = array('#theme' => 'gradebook_attendance_form');
+  $form['#timestamp'] = $timestamp;
+  $form['adate'] = array(
+    '#prefix' => '<div class="date_widget">',
+    '#suffix' => '</div>',
+    '#type' => $datetype,
+    '#title' => t('Attendence date'),
+    '#default_value' => $default,
+    '#date_label_position' => 'within',
+    '#date_increment' => 15,
+    '#date_year_range' => '-3:+3',
+    '#date_format' => 'Y-m-d H:i',
+  );
+
+  $form['students'] = array('#tree' => TRUE);
+  foreach ($names as $uid => $name) {
+    $form['students'][$uid] = array();
+    $form['students'][$uid]['name'] = array(
+        '#value' => $name,
+    );    
+    $form['students'][$uid]['present'] = array(
+      '#type' => 'select',
+      '#options' => array(
+        GRADEBOOK_ATTENDANCE_PRESENT => t('Present'),
+        GRADEBOOK_ATTENDANCE_ABSENT => t('Absent'),
+        GRADEBOOK_ATTENDANCE_TARDY => t('Tardy'),
+      ),
+      '#default_value' => isset($attendance) ? $attendance[$uid]['astatus'] : 1,
+    );
+  }
+  $form['return_url'] = array(
+    '#type' => 'value',
+    '#value' => 'gradebook/' . $gradebook->tid . '/attendance',
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save Attendance'),
+  );
+  $form['cancel'] = array('#type' => 'submit', '#value' =>  t('Cancel'), '#submit' => array('gradebook_attendance_form_cancel'));
+
+  $form['#gradebook'] = $gradebook;
+  
+  return $form;
+}
+
+function gradebook_attendance_form_submit($form, &$form_state) {
+  module_load_include('inc', 'gradebook', 'gradebook.datetime');
+  $gradebook = $form['#gradebook'];
+  $date = _gradebookapi_usedateapi() ? _gradebookapi_datepopup2unixtime($form_state['values']['adate']) :
+                                       _gradebookapi_drupaldate2unixtime($form_state['values']['adate']);
+  // Granularity of date timestamp is "day" 
+  $date =  mktime(0, 0, 0, date("m", $date), date("d", $date), date("Y", $date));
+  $attendance_exists = gradebook_attendance_today($gradebook->tid, $date);
+
+  foreach ($form_state['values']['students'] as $uid => $present) {
+    if ($form['#timestamp'] == 0) {
+      if ($attendance_exists) {
+        db_query("UPDATE {gradebook_attendance} SET adate = %d, astatus = %d  WHERE gid = %d AND uid = %d AND adate = %d", $date, $form_state['values']['students'][$uid]['present'], $gradebook->tid, $uid, $date);
+        $msg = t('The attendance record has been updated.');
+      }
+      else {
+        db_query("INSERT INTO {gradebook_attendance} (uid, gid, adate, astatus) VALUES (%d, %d, %d, %d)", $uid, $gradebook->tid, $date, $form_state['values']['students'][$uid]['present']);
+        $msg = t('A new attendance record has been created.');
+      }
+    }
+    else {
+      db_query("UPDATE {gradebook_attendance} SET adate = %d, astatus = %d  WHERE gid = %d AND uid = %d AND adate = %d", $date, $form_state['values']['students'][$uid]['present'], $gradebook->tid, $uid, $form['#timestamp']);
+      $msg = t('The attendance record has been updated.');
+    }
+  }
+  drupal_set_message($msg, 'status');
+  gradebook_attendance_calc_attendance_assignments($gradebook);
+  $form_state['redirect'] = $form_state['values']['return_url'];
+}
+
+function gradebook_attendance_form_cancel($form, &$form_state) {
+  $form_state['redirect'] = $form_state['values']['return_url'];
+  unset($form_state['values']['return_url']);
+}
+
+/**
+ * Returns HTML to theme the attendance form.
+ *
+ * @return
+ *   The HTML string ready to display.
+ *
+ * @ingroup themeable
+ */
+function theme_gradebook_attendance_form($form) { 
+  $ids = element_children($form['students']);
+  $header = array('name' => t('Name'), 'present' => t('Present'));  
+  $rows = array();
+  foreach ($ids as $uid) {
+    $row = array();
+    $row[] = array('data' => drupal_render($form['students'][$uid]['name']), 'class' => 'gradebook-attendance-name');
+    $row[] = array('data' => drupal_render($form['students'][$uid]['present']), 'class' => 'gradebook-attendance-select');
+    $rows[] = array('data' => $row);
+  }
+  $output = drupal_render($form['adate']);
+  $output .= theme('table', $header, $rows, array('class' => 'gradebook-attendance'));
+  $output .= drupal_render($form);
+  return $output;
+}
+
+/**
+ * Form builder to delete an attendance record.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $timestamp
+ *   The timestamp for record to be deleted.
+ *
+ * @see ggradebook_attendance_confirm_delete_submit()
+ * @ingroup forms
+ */
+function gradebook_attendance_confirm_delete(&$form_state, $gradebook, $timestamp) {
+  $form['#timestamp'] = $timestamp;
+  $form['#gradebook'] = $gradebook;
+  return confirm_form(
+    $form,
+    t('Are you sure you want to delete the attendence record of %date for %name?', array('%date' => format_date($timestamp, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y'), 0), '%name' => $gradebook->name)),
+    'gradebook/' . $gradebook->tid . '/attendance',
+    t('This action cannot be undone.'),
+    t('Delete'),
+    t('Cancel')
+  );
+}
+
+function gradebook_attendance_confirm_delete_submit($form, &$form_state) {
+  $timestamp = $form['#timestamp'];
+  $gradebook = $form['#gradebook'];
+  db_query('DELETE FROM {gradebook_attendance} WHERE gid = %d AND adate = %d', $gradebook->tid, $timestamp);
+  gradebook_attendance_calc_attendance_assignments($gradebook);
+  drupal_set_message(t('The Attendance record of %date for %name has been deleted.', array('%date' => format_date($timestamp, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y')), '%name' => $gradebook->name), 0), 'status');
+
+  $form_state['redirect'] ='gradebook/'. $gradebook->tid .'/attendance';
+  return;
+}
+
+/**
+ * Form builder to edit a student's attendance record.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $attendance
+ *   An array of attendendance records, indexed by timestamp.
+ *
+ * @see gradebook_attendance_student_form_submit()
+ * @ingroup forms
+ */
+function gradebook_attendance_student_form($form_state, $gradebook, $names, $attendance) {
+  module_load_include('inc', 'gradebook', 'gradebook.datetime');
+
+  $form = array('#theme' => 'gradebook_attendance_student_form');
+  $form['#studentname'] = array_pop($names);
+  $form['date'] = array();
+  $form['astatus'] = array();
+
+  foreach ($attendance as $timestamp => $record) {
+    $form['date'][$timestamp] = array(
+      '#prefix' => '<div class="gradebook-attendance-date">',
+      '#suffix' => '</div>',
+      '#value' => format_date($timestamp, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y'), 0),
+    );
+    $form['astatus'][$timestamp] = array(
+      '#type' => 'select',
+      '#options' => array(
+        GRADEBOOK_ATTENDANCE_PRESENT => t('Present'),
+        GRADEBOOK_ATTENDANCE_ABSENT => t('Absent'),
+        GRADEBOOK_ATTENDANCE_TARDY => t('Tardy'),
+      ),
+      '#default_value' => $record['astatus'],
+    );
+  }
+  $form['return_url'] = array(
+    '#type' => 'value',
+    '#value' => 'gradebook/' . $gradebook->tid . '/attendance',
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save Attendance'),
+  );
+  $form['cancel'] = array(
+    '#type' => 'submit',
+    '#value' => t('Cancel'),
+    '#submit' => array('gradebook_attendance_form_cancel'),
+  );
+
+  $form['#gradebook'] = $gradebook;
+
+  $form['uid'] = array(
+    '#type' => 'hidden',
+    '#value' => $uid,
+  );
+
+  return $form;
+}
+
+function gradebook_attendance_student_form_submit($form, &$form_state) {
+  module_load_include('inc', 'gradebook', 'gradebook.datetime');
+  $gradebook = $form['#gradebook'];
+  $uid = $form_state['values']['uid'];
+  foreach ($form_state['values']['astatus'] as $timestamp => $astatus) {
+    db_query("UPDATE {gradebook_attendance} SET astatus = %d WHERE gid = %d AND uid = %d AND adate = %d", $form_state['values']['astatus'][$timestamp], $gradebook->tid, $uid, $timestamp);
+  }
+  gradebook_attendance_calc_attendance_assignments($gradebook);
+  drupal_set_message('The attendance record has been updated.', 'status');
+
+  $form_state['redirect'] = $form_state['values']['return_url'];
+}
+
+/**
+ * Returns HTML to theme the student attendance form.
+ *
+ * @return
+ *   The HTML string ready to display.
+ *
+ * @ingroup themeable
+ */
+function theme_gradebook_attendance_student_form($form) { 
+  $timestamps = element_children($form['astatus']);
+  $header = array('date' => t('Date'), 'present' => t('Attendance'));  
+  $rows = array();
+  foreach ($timestamps as $timestamp) {
+    $row = array();
+    $row[] = array('data' => drupal_render($form['date'][$timestamp]), 'class' => 'gradebook-attendance-date');
+    $row[] = array('data' => drupal_render($form['astatus'][$timestamp]), 'class' => 'gradebook-attendance-status');
+    $rows[] = array('data' => $row);
+  }
+  $output = t('Student Name') . ': ' . check_plain($form['#studentname']);
+  $output .= theme('table', $header, $rows, array('class' => 'attendance'));
+  $output .= drupal_render($form);
+  return $output;
+}
+
+/**
+ * Implements hook_form_alter().
+ *
+ * @return NONE
+ */
+function gradebook_attendance_form_alter(&$form, $form_state, $form_id) {
+  if (isset($form['type']) && $form['type']['#value'] . '_node_form' == $form_id) {
+    $node = $form['#node'];
+    $types = gradebookapi_get_assignment_types();
+
+    // Are we an assignment type?
+    if (!empty($types)) {
+      if (in_array($node->type, $types)) {
+        // Provide option to make this assignment an attendance assignment
+        $form['gradebookapi']['gradebook_attendance'] = array(
+          '#type' => 'fieldset',
+          '#title' => t('Attendance Assignment Settings'),
+          '#tree' => FALSE,
+          '#collapsible' => TRUE,
+          '#collapsed' => FALSE,
+          '#weight' => 100,
+        );
+        $form['gradebookapi']['gradebook_attendance']['attendance_assignment'] = array(
+          '#type' => 'checkbox',
+          '#title' => t('Attendance Assignment'),
+          '#description' => t('Make this an attendence assignment, starting on the publish date and continuing until the due date. If you enable this option, students will receive points for being present, absent or tardy as specified below. The possible points for the assignment will be automatically computed each time attendance is taken.'),
+          '#default_value' => isset($node->attendance_assignment) ? $node->attendance_assignment : FALSE,
+        );
+        $form['gradebookapi']['gradebook_attendance']['grade_present'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Points if Present'),
+          '#default_value' => ($node->grade_present ? $node->grade_present : '0'),
+          '#size' => 4,
+          '#maxlength' => 10,
+          '#required' => TRUE,
+        );
+        $form['gradebookapi']['gradebook_attendance']['grade_absent'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Points if Absent'),
+          '#default_value' => ($node->grade_absent ? $node->grade_absent : '0'),
+          '#size' => 4,
+          '#maxlength' => 10,
+          '#required' => TRUE,
+        );
+        $form['gradebookapi']['gradebook_attendance']['grade_tardy'] = array(
+          '#type' => 'textfield',
+          '#title' => t('Points if Tardy'),
+          '#default_value' => ($node->grade_tardy ? $node->grade_tardy : '0'),
+          '#size' => 4,
+          '#maxlength' => 10,
+          '#required' => TRUE,
+        );
+
+        if ($node->attendance_assignment) {
+          // This will automatically be updated.
+          $form['gradebookapi']['possible']['#type'] = 'hidden';
+          $form['gradebookapi']['possible']['#value'] = 0;
+          // Modify the text for the publish date and start date 
+          $form['gradebookapi']['publish_date']['#title'] = t('Starting on');
+          $form['gradebookapi']['due_date']['#title'] = t('Ending on');
+        }
+      } 
+    }
+  }
+}
+
+/**
+ * Calculates attendance grades for any attendance assignments in the gradebook.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ */
+function gradebook_attendance_calc_attendance_assignments($gradebook) {
+
+  $assignments = gradebook_get_sorted_assignments($gradebook, array(), FALSE, 'category', 'ASC');
+
+  foreach ($assignments as $node) {
+    // Find all attendence assignments for this gradebook id.
+    if ($node->attendance_assignment) {
+      // Recalculate grades for each attendence assignment.
+      gradebook_attendance_set_grades($node);
+    }
+  }
+}
+
+
+/**
+ * Implements of hook_nodeapi().
+ *
+ * @return NONE
+ */
+function gradebook_attendance_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+  $types =(array)gradebookapi_get_assignment_types();
+  if (in_array($node->type, $types)) {
+    switch ($op) {
+      case 'load':
+        return gradebook_attendance_load($node);
+      case 'insert':
+        gradebook_attendance_insert($node);
+        break;
+      case 'update':
+        gradebook_attendance_update($node);
+        break;
+      case 'delete':
+        gradebook_attendance_delete($node);
+        break;
+      case 'view':
+        gradebook_attendance_view($node, $a3, $a4);
+        break;
+    }
+  } 
+}
+
+/**
+ *  gradebook_attendance_load().
+ *    Retrieve the additional form fields from the gradebook_attendance database table.
+ *    These fields will be added to assignment create node form.
+ *    Called via hook_nodeapi (load).
+ *  @param $node
+ *    the assignment node
+ *  @return
+ *    an array of form default values
+ */
+function gradebook_attendance_load($node) {
+  $additions = db_fetch_array(db_query('SELECT attendance_assignment, grade_present, grade_absent, grade_tardy FROM {gradebook_attendance_assignment} WHERE aid = %d', $node->nid));
+  return $additions;
+}
+
+/**
+ *  gradebookapi_assigment_insert().
+ *    Insert additional assignment fields into the gradebook_attendance database table.
+ *    The grades are then recalculated since the possible value, etc. may have changed.
+ *    Called via hook_nodeapi (insert).
+ *  @param $node
+ *    the assignment node
+ *  @return NONE
+ */
+function gradebook_attendance_insert($node) {
+  // This assumes that gradebookapi has a lighter weight than any submodules so it is called first:
+  db_query("INSERT INTO {gradebook_attendance_assignment} (aid, attendance_assignment, grade_present, grade_absent, grade_tardy) VALUES (%d, %d, %f, %f, %f)", $node->nid, $node->attendance_assignment, $node->grade_present, $node->grade_absent, $node->grade_tardy);
+
+  if ($node->attendance_assignment == 1) {
+    $points1 = ($node->grade_present == 1) ? 'point' : 'points';
+    $points2 = ($node->grade_tardy == 1) ? 'point' : 'points';
+    $points3 = ($node->grade_absent == 1) ? 'point' : 'points';
+    $date_start = format_date($node->publish_date, 'm-d-Y', 0);
+    $date_stop = format_date($node->due_date, 'm-d-Y', 0);
+    drupal_set_message(t('Students will automatically receive !possible !points1 for being present, !tardy !points2 for being tardy and !absent !points3 for being absent whenever attendence is taken between !date_start and !date_stop.', array('!possible' => $node->grade_present, '!points1' => $points1, '!tardy' => $node->grade_tardy, '!points2' => $points2, '!absent' => $node->grade_absent, '!points3' => $points3, '!date_start' => $date_start, '!date_stop' => $date_stop)));
+
+    gradebook_attendance_set_grades($node);
+  }
+}
+
+/**
+ *  gradebookapi_assigment_update().
+ *    Update additional assignment fields in the gradebook_attendance_assignment database table when the node is updated.
+ *    The grades are then recalculated since the possible value, etc. may have changed.
+ *    Called via hook_nodeapi (update).
+ *  @param $node
+ *    the assignment node
+ *  @return NONE
+ */
+function gradebook_attendance_update(&$node) {
+  if (db_result(db_query('SELECT aid FROM {gradebook_attendance_assignment} WHERE aid = %d', $node->nid))) {
+    db_query("UPDATE {gradebook_attendance_assignment} SET attendance_assignment = %d, grade_present = '%s', grade_absent = '%s', grade_tardy = '%s' WHERE aid = %d", $node->attendance_assignment, $node->grade_present, $node->grade_absent, $node->grade_tardy, $node->nid);
+    if ($node->attendance_assignment == 1) {
+      gradebook_attendance_set_grades($node);
+    }
+  }
+  else { // assignment doesn't exist in gradebook_attendance_assignment table, so insert it.
+    gradebook_attendance_insert($node);
+  }
+}
+
+/**
+ *  gradebookapi_attendance_delete().
+ *    Delete assignment field values from the gradebook_attendance_assignment database table when the node is deleted.
+ *    The grades are then recalculated.
+ *    Called via hook_nodeapi (delete).
+ *  @param $node
+ *    the assignment node
+ *  @return
+ *    NONE
+ */
+function gradebook_attendance_delete($node) {
+  // Delete records for all students for this assignment node.
+  db_query('DELETE FROM {gradebook_attendance_assignment} WHERE aid = %d', $node->nid);
+}
+
+/**
+ *  gradebookapi_assigment_view().
+ *    Add assignment field values to $node->content before rendering.
+ *    Called via hook_nodeapi (view).
+ *  @param $node
+ *    the assignment node
+ *  @param $teaser
+ *    the teaser parameter passed from node_view() 
+ *  @param $page
+ *    the page parameter passed from node_view()
+ *  @return NONE
+ */
+function gradebook_attendance_view(&$node, $teaser = FALSE, $page = FALSE) {
+  $node->content['attendance_assignment_notice'] = array(
+    '#value' => theme('gradebook_attendance_assignment_notice', $node),
+    '#weight' => -100,
+  );
+}
+
+/**
+ * Implements hook_gradebookapi_grade().
+ */
+function gradebook_attendance_gradebookapi_grade($action, &$grade) {
+  switch ($action) {
+    case 'get':
+      // Don't need to respond to any request to get the grade.
+      break;
+    case 'set':
+      // The attendance grade is set automatically, overriding whatever
+      // grade is set from the gradebook page.
+      $node = node_load($grade->nid);
+      gradebook_attendance_set_grades($node, array($grade->uid));
+      break;
+  }
+}
+
+function gradebook_attendance_calc_grades($node, $uids = array()) {
+  $grades = array();
+  $terms = gradebookapi_assignment_terms($node);
+  foreach ($terms as $term) {
+    // Retrieves the gradebook for this term and checks to see if the user is in the gradebook.
+    $gradebook = gradebookapi_get_tid_gradebook($term->tid);
+    if (empty($uids)) {
+      $students = gradebookapi_get_students($gradebook);
+      $uids = $students['uid'];
+    }
+    if (!empty($uids)) {
+      $result = db_query("SELECT u.uid FROM {users} u WHERE u.status <> 0 AND u.uid IN (" . db_placeholders($uids, 'int') . ") ORDER BY u.name ASC", $uids);
+    }
+    else {
+      $result = FALSE;
+    }
+    if ($result) {
+      $total = db_result(db_query("SELECT COUNT(DISTINCT adate) FROM {gradebook_attendance} WHERE gid = %d AND adate >= %d AND adate <= %d", $gradebook->tid, $node->publish_date, $node->due_date));
+      $possible = max($node->grade_absent, $node->grade_tardy, $node->grade_present) * $total;
+      while ($uid = db_result($result)) {
+        if ($term->tid != $gradebook->tid) {
+          $summary = gradebook_attendance_attendance_summary($gradebook->tid, $uid, $node->publish_date, $node->due_date);
+          $res = db_query('SELECT * FROM {gradebookapi_assignment} a INNER JOIN {gradebook_attendance_assignment} aa ON a.nid = aa.aid WHERE a.nid = %d', $node->nid);
+          if ($grade = db_fetch_object($res)) {
+            $grade->timestamp = time();
+            $grade->uid = $uid;
+            $grade->earned = $node->grade_present*($summary['present']);
+            if (isset($node->grade_tardy)) {
+              $grade->earned += $node->grade_tardy*($summary['tardy']);
+            }
+            if (isset($node->grade_absent)) {
+              $grade->earned += $node->grade_absent*($summary['absent']);
+            }
+            $grade->possible = $possible; 
+           // Leave note indicating how grade was determined.
+           // Need to figure out how to deal with grade possible and grade increment for this kind of assignment.
+
+            $grades[] = $grade;
+          }
+        }
+      }
+    }
+  }  
+  return $grades;
+}
+
+function gradebook_attendance_set_grades($node, $uids = array()) {
+  $grades = gradebook_attendance_calc_grades($node, $uids);
+  if (!empty($grades)) {
+    db_query("UPDATE {gradebookapi_assignment} SET possible = '%s' WHERE nid = %d", $grades[0]->possible, $node->nid);
+    foreach ($grades as $grade) {
+      if (db_result(db_query('SELECT * FROM {gradebookapi_grade} WHERE uid = %d and nid = %d', $grade->uid, $grade->nid))) {
+        if (is_numeric($grade->earned)) {
+          db_query("UPDATE {gradebookapi_grade} SET earned = %f WHERE uid = %d AND nid = %d", $grade->earned, $grade->uid, $grade->nid);
+        }
+        else {  // allow a grade to be returned to null status
+          db_query("UPDATE {gradebookapi_grade} SET earned = NULL WHERE uid = %d AND nid = %d", $grade->uid, $grade->nid);
+        }
+      }
+      else {
+        db_query("INSERT INTO {gradebookapi_grade} (uid, nid, earned, exempt, timestamp, note) VALUES (%d, %d, %f, %d, %d, '%s')", $grade->uid, $grade->nid, $grade->earned, $grade->exempt, $grade->timestamp, $grade->note);
+      }
+    }
+    gradebookapi_calc_assignment_grades($node);
+  }
+}
+
+/**
+ * Menu callback; prints an assignment list with student grades.
+ *
+ * Leave this callback in gradebook.module to make it easy for other gradebook modules to find and use.
+ * All other page callbacks go in
+ *   gradebook.pages.inc (pages associated with displaying or editing a grade), or
+ *   gradebook.cateogry.inc (pages associated with gradebook categories)
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $uid
+ *   The student's user id.
+ * @param $export
+ *   If TRUE, prepare the page for export, otherwise prepare it for the screen.
+ *
+ * @return
+ *   The HTML string ready to display.
+ */
+function gradebook_attendance_page($gradebook, $uid = NULL, $export = FALSE) {
+  global $user;
+  $user = user_load(array('uid' => $user->uid));
+  $attendance = array();
+  $timestamps = array();
+  $students = array();
+  $default_asort = 'ASC';
+  $asort = isset($_GET['asort']) ? (($_GET['asort'] == 'desc') ? 'DESC' : 'ASC') : $default_asort;
+  $default_nsort = 'ASC';
+  $nsort = isset($_GET['nsort']) ? (($_GET['nsort'] == 'desc') ? 'DESC' : 'ASC') : $default_nsort;
+  $teacher = gradebookapi_is_teacher($gradebook);
+  // Make sure user has permission to be here.
+  if (!$teacher && !empty($uid)) {
+    if ($uid != $user->uid) {  
+      drupal_access_denied();
+      return;
+    }
+  }
+
+  // If user is not a teacher, set uid to own.
+  if (!$teacher) {
+    $uid = $user->uid;
+  }
+
+  $students = gradebookapi_get_students($gradebook);
+
+  if (!empty($uid)) {
+    $key = array_search($uid, $students['uid']);
+    if ($key) {
+      $students = array('uid' => $students['uid'][$key], 'name' => $students['name'][$key]);
+      $result = db_query("SELECT uid FROM {users} WHERE status <> 0 AND uid = %d", $uid);
+    }
+    else {
+      $result = FALSE;
+    }
+  }
+  else {
+    if (!empty($students['uid'])) {
+      $result = db_query("SELECT uid FROM {users}  WHERE status <> 0 AND uid IN (" . db_placeholders($students['uid'], 'int') .") ORDER BY name " . $nsort, $students['uid']);
+    }
+    else {
+      $result = FALSE;
+    }
+  }
+  if ($result) {
+    $sql = "SELECT astatus, adate FROM {gradebook_attendance} WHERE gid = %d AND uid = %d ORDER BY adate " . $asort;
+    //$sql_count = "SELECT COUNT(adate) FROM {gradebook_attendance} WHERE gid = %d AND uid = %d";
+
+    while ($suid = (int) db_result($result)) {
+      $sql = db_rewrite_sql($sql, $gradebook->tid, $suid);
+      //$sql_count = db_rewrite_sql($sql_count, $gradebook->tid, $suid);
+      if (!$export) {
+        // @TODO - fix pager for attendance page
+        // Note: don't use pager on export.
+        //$res = pager_query($sql, variable_get('gradebook_grades_per_page', 10), 0, $sql_count, $gradebook->tid, $suid);
+        $res = db_query($sql, $gradebook->tid, $suid);
+      }
+      else {
+        $res = db_query($sql, $gradebook->tid, $suid);
+      }
+      $attendance[$suid] = array();
+      while ($arecord = db_fetch_array($res)) {
+        $attendance[$suid][$arecord['adate']] = $arecord['astatus'];
+      }
+      $last_suid = $suid;
+    }
+    $timestamps = array_keys($attendance[$last_suid]);
+  }
+  if ($teacher) {
+    $func = ($export) ? 'gradebook_attendance_export_page' : 'gradebook_attendance_teacher_page';
+    return theme($func, $gradebook, $timestamps, $attendance, $students);
+  }
+  else {
+    return theme('gradebook_attendance_student_page', $gradebook, $timestamps, $attendance, $students);
+  }
+}
+
+/**
+ * Theme the gradebook attendance page for students.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $attendance
+ *   An two-dimensional array of gradebook attendance records, indexed by student id and timestamp.
+ * @param $attendance
+ *   An array of unique timestamps when attendance was taken.
+ * @param $student
+ *   An array containing information for the student whose attendance records are to be displayed.
+ *
+ * @return
+ *   The HTML string ready to display.
+ *
+ * @ingroup themeable
+ */
+function theme_gradebook_attendance_student_page($gradebook, $timestamps, $attendance, $students) {
+  $asort0 = isset($_GET['asort']) ? $_GET['asort'] : 'asc';
+  $asort1 = ($asort0 == 'asc') ? 'desc' : 'asc';
+  $query = 'asort=' . $asort1;
+  $text = l('Date', 'gradebook/' . $gradebook->tid . '/attendance', array('query' => $query));
+  $headers = array('date' =>  $text, 'attendance' => t('Attendance'));
+  $rows = array();
+  $record = array_pop($attendance);
+  $totals = array(GRADEBOOK_ATTENDANCE_PRESENT => 0, GRADEBOOK_ATTENDANCE_ABSENT => 0, GRADEBOOK_ATTENDANCE_TARDY => 0);
+  foreach ($record as $timestamp => $astatus) {
+    $row = array();
+    ++$totals[$astatus];
+    $row[] = array('data' => format_date($timestamp, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y'), 0), 'class' => 'gradebook-attendance-date');
+    $row[] = theme('gradebook_attendance_status', $astatus);
+    $rows[] = array('data' => $row);
+  }
+
+  $output = '<div id = "gradebook-attendance-student-container">';
+  $output .= '<div id = "gradebook-attendance-page-links"><ul><li>';
+  $addlinks = module_invoke_all('gradebook_attendance_page_links', $gradebook);
+  $output .= implode("</li><li>", $addlinks);
+  $output .= '</li></ul></div>';
+  $output .= '<p><span class = "gradebook-attendance-student-name">';
+  $output .= t('Attendance Record for') . ' ' . $students['name'] . '</span></p>';
+  $output .= '<p class = "gradebook-attendance-student-summary"><span class = "gradebook-attendance-student-present">';
+  $output .= t('Present') . ' (' . $totals[GRADEBOOK_ATTENDANCE_PRESENT] . ')</span>' . '&nbsp';
+  $output .= '<span class = "gradebook-attendance-student-absent">';
+  $output .= t('Absent') . ' (' . $totals[GRADEBOOK_ATTENDANCE_ABSENT] . ')</span>' . '&nbsp';
+  $output .= '<span class = "gradebook-attendance-student-tardy">';
+  $output .= t('Tardy') . ' (' . $totals[GRADEBOOK_ATTENDANCE_TARDY] . ')</span>' . '&nbsp'. '</p>';
+
+  $output .= theme('table', $headers, $rows, array('class' => 'gradebook-attendance-student-table'));
+  $output .= '</div>';
+
+  return $output;
+}
+
+/**
+ * Theme the gradebook attendance page for teachers.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $attendance
+ *   An two-dimensional array of gradebook attendance records, indexed by student id and timestamp.
+ * @param $attendance
+ *   An array of unique timestamps when attendance was taken.
+ * @param $students
+ *   An array containing information for the students whose attendance records are to be displayed.
+ *
+ * @return
+ *   The HTML string ready to display.
+ *
+ * @ingroup themeable
+ */
+function theme_gradebook_attendance_teacher_page($gradebook, $timestamps, $attendance, $students) {
+  // This is needed because keys of $students is lost in module_invoke_all call.
+  $suid = array_flip($students['uid']);
+  $asort0 = isset($_GET['asort']) ? $_GET['asort'] : 'asc';
+  $asort1 = ($asort0 == 'asc') ? 'desc' : 'asc';
+  $nsort0 = isset($_GET['nsort']) ? $_GET['nsort'] : 'asc';
+  $nsort1 = ($nsort0 == 'asc') ? 'desc' : 'asc';
+
+  $query = 'asort=' . $asort0 . '&nsort=' . $nsort1;
+  $text = l('Name', 'gradebook/' . $gradebook->tid . '/attendance', array('query' => $query));
+  $headers = array('date' =>  array($text), 'delete' => array(''), 'edit' => array(''),
+  );
+  $headers['date'][] = array('data' => t('Totals') . '<br>' . '(' . t('Present /Absent /Tardy') . ')', 'class' => 'gradebook-attendance-totals');
+  $query = 'asort=' . $asort1 . '&nsort=' . $nsort0;
+  $text = l('Date', 'gradebook/' . $gradebook->tid . '/attendance', array('query' => $query));
+  $headers['date'][] = array('data' => $text, 'class' => 'gradebook-attendance-space');
+
+  $value = array('data' => '', 'class' => 'gradebook-attendance-delete');
+  for ($i = 0; $i < 2; $i++) {
+    $headers['delete'][] = $value;
+  }
+
+  $value = array('data' => '', 'class' => 'gradebook-attendance-edit-all');
+  for ($i = 0; $i < 2; $i++) {
+    $headers['edit'][] = $value;
+  }
+  foreach ($timestamps as $timestamp) {
+    $headers['date'][] = array('data' => format_date($timestamp, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y'), 0), 'class' => 'gradebook-attendance-date');
+    $headers['delete'][] = array('data' => l('[delete]', 'gradebook/' . $gradebook->tid . '/attendance/delete/' . $timestamp), 'class' => 'gradebook-attendance-delete');
+    $headers['edit'][] = array('data' => l('[edit]', 'gradebook/' . $gradebook->tid . '/attendance/edit/' . $timestamp), 'class' => 'gradebook-attendance-edit');
+  }
+  $rows = array();
+  foreach ($attendance as $uid => $record) {
+    $row = array('');
+    $totals = array(GRADEBOOK_ATTENDANCE_PRESENT => 0, GRADEBOOK_ATTENDANCE_ABSENT => 0, GRADEBOOK_ATTENDANCE_TARDY => 0);
+    foreach ($record as $timestamp => $astatus) {
+      ++$totals[$astatus];
+      $path = 'gradebook/' . $gradebook->tid . '/attendance/edit/' . $timestamp . '/' . $uid;
+      $row[] = theme('gradebook_attendance_status', $astatus, $path);
+    }
+    $summary = array(l($students['name'][$suid[$uid]], 'gradebook/' . $gradebook->tid . '/attendance/edit-all/' . $uid));
+    $summary[] = theme('gradebook_attendance_totals', $totals);
+    $rows[] = array_merge($summary, $row);
+  }
+
+  $output = '<div id="gradebook-attendance-container">';
+  $output .= '<div id="gradebook-attendance-page-links"><ul><li>';
+  $addlinks = module_invoke_all('gradebook_attendance_page_links', $gradebook);
+  $output .= implode("</li><li>", $addlinks);
+  $output .= '</li></ul></div>';
+  $output .= theme('gradebook_table', $headers, $rows, array('class' => 'gradebook-attendance-table'));
+  $output .= '</div>';
+  // This can be configured at the gradebook admin screen.
+  //$output .= theme('pager', NULL, variable_get('gradebook_grades_per_page', 10), 0);
+
+  return $output;
+}
+
+/**
+ * Theme the gradebook attendance page for export.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $attendance
+ *   An two-dimensional array of gradebook attendance records, indexed by student id and timestamp.
+ * @param $attendance
+ *   An array of unique timestamps when attendance was taken.
+ * @param $students
+ *   An array containing information for the students whose attendance records are to be displayed.
+ *
+ * @return
+ *   The HTML string ready to display.
+ *
+ * @ingroup themeable
+ */
+function theme_gradebook_attendance_export_page($gradebook, $timestamps, $attendance, $students) {
+  // This is needed because keys of $students is lost in module_invoke_all call.
+  $suid = array_flip($students['uid']);
+
+  $headers = array('date' =>  array(t('Name')));
+  $headers['date'][] = t('Totals') . ' (' . t('Present /Absent /Tardy') . ')';
+  $headers['date'][]  =t('Date');
+  foreach ($timestamps as $timestamp) {
+    $headers['date'][] = format_date($timestamp, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y'), 0);
+  }
+  $rows = array();
+  foreach ($attendance as $uid => $record) {
+    $row = array('');
+    $totals = array(GRADEBOOK_ATTENDANCE_PRESENT => 0, GRADEBOOK_ATTENDANCE_ABSENT => 0, GRADEBOOK_ATTENDANCE_TARDY => 0);
+    foreach ($record as $timestamp => $astatus) {
+      ++$totals[$astatus];
+      $row[] = theme('gradebook_attendance_status', $astatus);
+    }
+    $summary = array(check_plain($students['name'][$suid[$uid]]));
+    $summary[] = theme('gradebook_attendance_totals', $totals, TRUE);
+    $rows[] = array_merge($summary, $row);
+  }
+  return array_merge($headers, $rows);
+}
+
+/**
+ * Theme the attendance row.
+ *
+ * @param $astatus
+ *   An integer indicating the stduent's attendance.
+ * @param $path
+ *   An optional drupal path to link the text to.
+ *
+ * @return
+ *   The HTML string ready to display.
+ *
+ * @ingroup themeable
+ */
+function theme_gradebook_attendance_status($astatus, $path = NULL) {
+  switch ($astatus) {
+    case GRADEBOOK_ATTENDANCE_PRESENT :
+      $text = 'P';
+      $class = 'present';
+      break;
+    case GRADEBOOK_ATTENDANCE_ABSENT :
+      $text = 'A';
+      $class = 'absent';
+      break;
+    case GRADEBOOK_ATTENDANCE_TARDY :
+      $text = 'T';
+      $class = 'tardy';
+      break;
+    default :
+      $text = variable_get('gradebook_empty_grade', '--');
+      $class = 'empty';
+  }
+
+  if ($path) {
+    $ret = array();
+    $ret['data'] = l($text, $path);
+    $ret['class'] = 'gradebook-attendance-' . $class;
+  }
+  else {
+    $ret = $text;
+  }
+  return $ret;
+}
+
+/**
+ * Theme the attendance totals.
+ *
+ * @param $totals
+ *   An array with total number of present, absent, and tardy
+ *   attendance records.
+ *
+ * @return
+ *   The HTML string ready to display.
+ *
+ * @ingroup themeable
+ */
+function theme_gradebook_attendance_totals($totals, $export = FALSE) {
+  $text = '(' . implode('/', $totals) . ')';
+  if (!$export) {
+    $ret = array();
+    $ret['data'] = $text;
+    $ret['class'] = 'gradebook-attendance-totals';
+  }
+  else {
+    $ret = $text;
+  }
+  return $ret;
+}
+
+/**
+ *  Provides a notice with assignment information on the attendance assignment node. 
+ * 
+ *  @param $node
+ *    The assignment node
+ *  @return
+ *    The HTML string ready to display
+ */
+function theme_gradebook_attendance_assignment_notice($node) {
+  drupal_set_message("assignment notice");
+  if ($node->attendance_assignment == 1) {
+    global $user;
+    $account = user_load(array('uid' => $user->uid));
+    // Retrieve gradebook name and assignment category.
+    $terms = gradebookapi_assignment_terms($node);
+    // Collects gradebook name and category name for this assignment
+    foreach ($terms as $term) {
+      // Retrieves the gradebook for this term and checks to see if the user in the gradebook.
+      $gradebook = gradebookapi_get_tid_gradebook($term->tid);
+      if (gradebookapi_is_student($gradebook, $account)) {
+        $points1 = ($node->grade_present == 1) ? 'point' : 'points';
+        $points2 = ($node->grade_tardy == 1) ? 'point' : 'points';
+        $points3 = ($node->grade_absent == 1) ? 'point' : 'points';
+        $date_start = format_date($node->publish_date, 'm-d-Y', 0);
+        $date_stop = format_date($node->due_date, 'm-d-Y', 0);
+
+        $output = '<div class = "gradebook-attendance-assignment-notice">';
+        $output .= '<p>' . t('A grade will be given for class attendance: ');
+        $output .= t('!possible !points1 for being present, !tardy !points2 for being tardy and !absent !points3 for being absent whenever attendence is taken between !date_start and !date_stop.', array('!possible' => $node->grade_present, '!points1' => $points1, '!tardy' => $node->grade_tardy, '!points2' => $points2, '!absent' => $node->grade_absent, '!points3' => $points3, '!date_start' => $date_start,  '!date_stop' => $date_stop));
+        $output .= '</p></div>';
+        return $output;
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_gradebook_export().
+ */
+function gradebook_attendance_gradebook_export() {
+  return array('gradebook_attendance_page' => t('Attendance Page'));
+}

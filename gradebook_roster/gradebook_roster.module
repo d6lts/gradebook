@@ -58,7 +58,7 @@ function gradebook_roster_menu() {
 function gradebook_roster_gradebook_grade_page_links($gradebook) {
   $links = array();
   if (gradebookapi_is_teacher($gradebook) && !gradebook_roster_user_has_role($gradebook, 'grading assistant')) {
-    $link = l('roster', 'gradebook/' . $gradebook->tid . '/roster');
+    $link = l('Roster', 'gradebook/' . $gradebook->tid . '/roster');
     $links[] = $link;
   }
   return $links;

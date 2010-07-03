@@ -13,9 +13,15 @@ function gradebook_download_form(&$form_state, $gradebook) {
 
   $form = array();
 
-  $form['gradebook'] = array(
-    '#type' => 'value',
-    '#value' => $gradebook,
+  $form['#gradebook'] = $gradebook;
+  $options = gradebook_export_pages();
+  $default = array_shift(array_keys($options));
+    $form['func'] = array(
+    '#type' => 'radios',
+    '#title' => t('Page to Export'),
+    '#options' => $options,
+    '#default_value' => $default,
+    '#required' => TRUE,
   );
 
   $form['format'] = array(
@@ -45,13 +51,26 @@ function gradebook_download_form(&$form_state, $gradebook) {
     '#type' => 'submit',
     '#value' => t('Download'),
   );
-
+  $form['#gradebook_page'] = $gradebook_page;
   return $form;
 }
 
 function gradebook_download_form_submit(&$form, &$form_state) {
-  gradebook_download($form_state['values']['gradebook'], $form_state['values']['format'], $form_state['values']);
+  gradebook_download($form['#gradebook'], $form_state['values']['func'], $form_state['values']['format'], $form_state['values']);
 }
+
+/**
+ * Return a list of possible pages to export for display in a select list.
+ */
+function gradebook_export_pages() {
+  $pages = module_invoke_all('gradebook_export');
+  
+  foreach ($pages as $func => $title) {
+    $list[$func] = $title;
+  }
+  return $list;
+}
+
 
 /**
  * Generate a Excel-readable CSV file containing all submissions for a Gradebook.
@@ -60,7 +79,7 @@ function gradebook_download_form_submit(&$form, &$form_state) {
  * A couple of header rows are added to the normal gradebook_gradebook_page table
  * to help identify the table.
  */
-function gradebook_download($gradebook, $format = 'delimiter', $options = array()) {
+function gradebook_download($gradebook, $gradebook_page, $format = 'delimiter', $options = array()) {
   require_once('gradebook_export.inc');
 
   if (empty($options)) {
@@ -80,7 +99,7 @@ function gradebook_download($gradebook, $format = 'delimiter', $options = array(
   $header[] = array(check_plain($gradebook->name));
   $header[] = array(t('Downloaded on:'), format_date(time(), 'custom', "F j, Y, g:i a"));
 
-  $gradebook_table = gradebook_gradebook_page($gradebook, $uid = NULL, $export = TRUE);
+  $gradebook_table = $gradebook_page($gradebook, $uid = NULL, $export = TRUE);
   $gradebook_table = array_merge($header, $gradebook_table);
 
   // Add rows to the file.
