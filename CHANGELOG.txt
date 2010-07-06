@@ -1,5 +1,9 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2010-07-06
+----------------------
+* by MGN: Initial integration with the rules module.
+
 Gradebook 6.x.2.x-dev, 2010-07-03
 ----------------------
 #403072 by jdwfly and MGN: Added gradebook_attendance submodule.

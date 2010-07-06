@@ -387,6 +387,10 @@ function gradebookapi_set_grade($grade) {
     $func = $module.'_gradebookapi_grade';
     $func('set', $grade); //allows pass by reference!
   }
+  if (module_exists('rules')) {
+    $user = user_load(array('uid' => $grade->uid));
+    rules_invoke_event('gradebookapi_set_grade', array('user' => $user, 'node' => &$node)); 
+  }
 }
 
 /**
@@ -683,7 +687,7 @@ function gradebookapi_assignment_update(&$node) {
     $node->publish_date = _gradebookapi_drupaldate2unixtime($node->publish_date);
     $node->due_date = _gradebookapi_drupaldate2unixtime($node->due_date);
   }
-  if (db_result(db_query('SELECT * FROM {gradebookapi_assignment} a WHERE a.nid = %d', $node->nid))) {
+  if (gradebookapi_is_assignment_node($node)) {
     db_query("UPDATE {gradebookapi_assignment} SET possible = '%s', publish_date = '%d', due_date = '%d' WHERE nid = %d", $node->possible, $node->publish_date, $node->due_date, $node->nid); 
   }
   else { // assignment doesn't exist in gradebookapi_assignment table, so insert it
@@ -716,10 +720,10 @@ function gradebookapi_assignment_update(&$node) {
  *    NONE
  */
 function gradebookapi_assignment_delete($node) {
-  // delete records for all students for this assignment node
+  // Delete records for all students for this assignment node.
   db_query('DELETE FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid);
-  // delete grades for all users for this assignment node
-     db_query('DELETE FROM {gradebookapi_grade} WHERE nid = %d', $node->nid);
+  // Delete grades for all users for this assignment node.
+  db_query('DELETE FROM {gradebookapi_grade} WHERE nid = %d', $node->nid);
 
   // If taxonomy_node_delete has already been called, then we loose the info in
   // {term_node} needed to recalculate the grade instead, gather the gradebook api
@@ -730,7 +734,7 @@ function gradebookapi_assignment_delete($node) {
   $terms= array();
   foreach ($allterms as $term) {
     if ($term->vid == $vid) {
-      $terms[$term->tid]=$term;
+      $terms[$term->tid] = $term;
     }
   }
   gradebookapi_calc_assignment_grades($node, $terms);
@@ -760,12 +764,25 @@ function gradebookapi_assignment_view(&$node, $teaser = FALSE, $page = FALSE) {
 }
 
 /**
- *  Provides a notice with assignment information on the assignment node. 
- * 
+ * Determines if the node is an assignment node.
+ *
  *  @param $node
  *    The assignment node
  *  @return
- *    The HTML string ready to display
+ *    TRUE if the node is an assignment node, FALSE otherwise.
+ */
+function gradebookapi_is_assignment_node($node) {
+  $count = db_result(db_query('SELECT COUNT(nid) FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid));
+  return ($count >0);
+}
+
+/**
+ * Provides a notice with assignment information on the assignment node. 
+ *
+ * @param $node
+ *   The assignment node
+ * @return
+ *   The HTML string ready to display
  */
 function theme_gradebookapi_assignment_notice($node) {
   global $user;
