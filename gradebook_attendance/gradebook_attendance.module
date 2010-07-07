@@ -805,33 +805,30 @@ function gradebook_attendance_calc_grades($node, $uids = array()) {
 }
 
 function gradebook_attendance_set_grades($node, $uids = array()) {
-  $grades = gradebook_attendance_calc_grades($node, $uids);
-  if (!empty($grades)) {
-    db_query("UPDATE {gradebookapi_assignment} SET possible = '%s' WHERE nid = %d", $grades[0]->possible, $node->nid);
-    foreach ($grades as $grade) {
-      if (db_result(db_query('SELECT * FROM {gradebookapi_grade} WHERE uid = %d and nid = %d', $grade->uid, $grade->nid))) {
-        if (is_numeric($grade->earned)) {
-          db_query("UPDATE {gradebookapi_grade} SET earned = %f WHERE uid = %d AND nid = %d", $grade->earned, $grade->uid, $grade->nid);
+  if ($node->attendance_assignment) {
+    $grades = gradebook_attendance_calc_grades($node, $uids);
+    if (!empty($grades)) {
+      db_query("UPDATE {gradebookapi_assignment} SET possible = '%s' WHERE nid = %d", $grades[0]->possible, $node->nid);
+      foreach ($grades as $grade) {
+        if (db_result(db_query('SELECT * FROM {gradebookapi_grade} WHERE uid = %d and nid = %d', $grade->uid, $grade->nid))) {
+          if (is_numeric($grade->earned)) {
+            db_query("UPDATE {gradebookapi_grade} SET earned = %f WHERE uid = %d AND nid = %d", $grade->earned, $grade->uid, $grade->nid);
+          }
+          else {  // allow a grade to be returned to null status
+            db_query("UPDATE {gradebookapi_grade} SET earned = NULL WHERE uid = %d AND nid = %d", $grade->uid, $grade->nid);
+          }
         }
-        else {  // allow a grade to be returned to null status
-          db_query("UPDATE {gradebookapi_grade} SET earned = NULL WHERE uid = %d AND nid = %d", $grade->uid, $grade->nid);
+        else {
+          db_query("INSERT INTO {gradebookapi_grade} (uid, nid, earned, exempt, timestamp, note) VALUES (%d, %d, %f, %d, %d, '%s')", $grade->uid, $grade->nid, $grade->earned, $grade->exempt, $grade->timestamp, $grade->note);
         }
       }
-      else {
-        db_query("INSERT INTO {gradebookapi_grade} (uid, nid, earned, exempt, timestamp, note) VALUES (%d, %d, %f, %d, %d, '%s')", $grade->uid, $grade->nid, $grade->earned, $grade->exempt, $grade->timestamp, $grade->note);
-      }
+      gradebookapi_calc_assignment_grades($node);
     }
-    gradebookapi_calc_assignment_grades($node);
   }
 }
 
 /**
- * Menu callback; prints an assignment list with student grades.
- *
- * Leave this callback in gradebook.module to make it easy for other gradebook modules to find and use.
- * All other page callbacks go in
- *   gradebook.pages.inc (pages associated with displaying or editing a grade), or
- *   gradebook.cateogry.inc (pages associated with gradebook categories)
+ * Menu callback; prints an attendance page.
  *
  * @param $gradebook
  *   The gradebook object.
