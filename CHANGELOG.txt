@@ -1,5 +1,9 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2010-07-07
+----------------------
+#418028 by manolopm and MGN: Initial integration with the quiz module.
+
 Gradebook 6.x.2.x-dev, 2010-07-06
 ----------------------
 * by MGN: Initial integration with the rules module.

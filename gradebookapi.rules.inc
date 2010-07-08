@@ -50,7 +50,7 @@ function gradebookapi_rules_condition_info() {
 /**
  * Condition: Check if node is an assignment node.
  */
-function rules_condition_content_is_assignment_($node) {
+function rules_condition_content_is_assignment($node) {
   return array('is_assignment' => gradebookapi_is_assignment_node($node));
 }
 

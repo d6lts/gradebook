@@ -1258,3 +1258,10 @@ function gradebook_gradebook_legend() {
 function gradebook_gradebook_export() {
   return array('gradebook_gradebook_page' => t('Gradebook Page'));
 }
+
+/**
+ * Conditionally loads quiz hook implementations.
+ */
+if (module_exists('quiz')) {
+  module_load_include('inc', 'gradebook', 'gradebook.quiz');
+}
