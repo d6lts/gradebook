@@ -50,29 +50,20 @@ function gradebookapi_views_data()  {
   $data = array();
   $data['gradebookapi_assignment']['table']['group']  = t('Gradebook Assignment');
 
+  $data['gradebookapi_assignment']['table']['base'] = array(
+    'field' => 'nid',
+    'title' => t('Gradebook Assignment'),
+    'help' => t("Information about an assignment."),
+    'weight' => -10,
+  );
   // tables + fields that can be used for SQL Joins
   $data['gradebookapi_assignment']['table']['join'] = array(
     'node' => array(
       'left_field' => 'nid',
       'field' => 'nid',
     ),
-    'gradebookapi_grade' => array(
-      'type' => 'INNER',
-      'left_field' => array('nid', 'uid'),
-      'field' => 'nid',
-    ),
   );
-  $data['gradebookapi_grade']['table']['join'] = array(
-    'node' => array(
-      'left_field' => 'nid',
-      'field' => 'nid',
-    ),
-    'gradebookapi_assignment' => array(
-      'type' => 'INNER',
-      'left_field' => 'nid',
-      'field' => 'nid',
-    ),
-  );
+
   // Due_date.
   $data['gradebookapi_assignment']['due_date'] = array(
     'title' => t('Due Date'),
@@ -129,6 +120,10 @@ function gradebookapi_views_data()  {
       'left_field' => 'nid',
       'field' => 'nid',
     ),
+    'user' => array(
+      'left_field' => 'uid',
+      'field' => 'uid',
+    ),
     'gradebookapi_assignment' => array(
       'left_field' => 'nid',
       'field' => 'nid',
@@ -181,11 +176,26 @@ function gradebookapi_views_data()  {
   $data['gradebookapi_grade']['uid'] = array(
     'title' => t('Student'),
     'help' => t('The student associated with the grade.'),
+    'field' => array(
+      'handler' => 'views_handler_field_user',
+      'click sortable' => TRUE,
+    ),
+    'argument' => array(
+      'handler' => 'views_handler_argument_user_uid',
+      'name field' => 'name', // display this field in the summary
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
     'relationship' => array(
       'base' => 'users',
       'field' => 'uid',
       'handler' => 'views_handler_relationship',
       'label' => t('Student'),
+    ),
+   'filter' => array(
+      'title' => t('Student Name'),
+      'handler' => 'gradebookapi_views_handler_filter_user_grade',
     ),
   );
 
@@ -194,6 +204,7 @@ function gradebookapi_views_data()  {
     'help' => t('The node associated with the grade.'),
     'relationship' => array(
       'base' => 'node',
+      'type' => 'INNER',
       'field' => 'nid',
       'handler' => 'views_handler_relationship',
       'label' => t('Assignment node'),
@@ -201,6 +212,22 @@ function gradebookapi_views_data()  {
   );
 
   return $data;
+}
+
+/**
+ * Implement hook_views_handlers() 
+ */
+function gradebookapi_views_handlers() {
+  return array(
+    'info' => array(
+      'path' => drupal_get_path('module', 'gradebook'),
+    ),
+    'handlers' => array(
+      'gradebookapi_views_handler_filter_user_grade' => array(
+        'parent' => 'views_handler_filter_boolean_operator',
+      ),
+    ),
+  );
 }
 
 /**

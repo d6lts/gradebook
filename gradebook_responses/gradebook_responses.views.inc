@@ -46,6 +46,10 @@ function gradebook_responses_views_data()  {
       'left_field' => 'uid',
       'field' => 'uid',
     ),
+    'gradebookapi_assignment' => array(
+      'left_field' => 'nid',
+      'field' => 'aid',
+    ),
   );
 
  // Response Status.

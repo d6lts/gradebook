@@ -386,7 +386,15 @@ IV. Description of Optional Submodules
        style. The default emphasis can be adjusted by overriding or editing the
        gradebook_attendance.css file.
 
-V. Developer notes
+V. Integration with other modules
+   Aside from the optional submodules, Gradebook 2.0 integrates with other Drupal
+   modules.
+   A. Taxonomy
+   B. Views
+   C. Rules
+   D. Quiz   
+
+VI. Developer notes
 ------------------
 1. The Gradebook module was written for Drupal 4.7 and 5 by Robert Wohleb and
    was ported to Drupal 6 by Michael Nichols.
