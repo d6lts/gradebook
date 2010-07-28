@@ -23,4 +23,6 @@ function gradebook_uninstall() {
 
   $vid = variable_get('gradebookapi_nav_vocabulary', '');
   taxonomy_del_vocabulary($vid);
+  // Delete all variables.
+  db_query("DELETE FROM {variable} WHERE name LIKE 'gradebook_%%'");
 }

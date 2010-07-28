@@ -1,5 +1,9 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2010-07-28
+----------------------
+#866780 by MGN: Fixing bug that prevents teacher from modifying gradebook response form settings.
+
 Gradebook 6.x.2.x-dev, 2010-07-19
 ----------------------
 #850346 by MGN: Fixing views that seek to join response nodes to grades.

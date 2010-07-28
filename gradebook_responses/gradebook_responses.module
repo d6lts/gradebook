@@ -415,6 +415,7 @@ function gradebook_responses_form_elements($node) {
   $status_options = _gradebook_responses_status_string('student');
   $locked = (isset($node->rstatus) && $node->rstatus == GRADEBOOK_RESPONSES_GRADED);
   global $user;
+  $viewer = user_load(array('uid' => $user->uid));
   $account = user_load(array('uid' => $node->uid));
   // Prepares a list of all possible assignments for this user.
   $options = array('none' => '- ' . t('None') . ' -');
@@ -422,6 +423,9 @@ function gradebook_responses_form_elements($node) {
   $result = db_query('SELECT DISTINCT t.tid FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = %d', $vid);
   while ($tid = db_result($result)) {
     $gradebook = gradebookapi_gradebook_load($tid);
+    if (gradebookapi_is_teacher($gradebook, $viewer)) {
+      $locked = FALSE;
+    }
     if (gradebookapi_is_student($gradebook, $account)) {
       $res = gradebookapi_select_nodes($gradebook, array(), 'or', 0, FALSE);
       // Gets the assignments.
