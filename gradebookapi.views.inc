@@ -101,8 +101,9 @@ function gradebookapi_views_data()  {
     'title' => t('Possible'),
     'help' => t('Possible points for assignment.'),
     'field' => array(
-      'handler' => 'views_handler_field_numeric',
+      'handler' => 'gradebookapi_views_handler_field_numeric',
       'click sortable' => TRUE,
+      'float' => TRUE,
     ),
     'filter' => array(
       'handler' => 'views_handler_filter_numeric',
@@ -134,8 +135,9 @@ function gradebookapi_views_data()  {
     'title' => t('Earned'),
     'help' => t('Points earned for assignment.'),
     'field' => array(
-      'handler' => 'views_handler_field_numeric',
+      'handler' => 'gradebookapi_views_handler_field_numeric',
       'click sortable' => TRUE,
+      'float' => TRUE,
     ),
     'filter' => array(
       'handler' => 'views_handler_filter_numeric',
@@ -170,6 +172,22 @@ function gradebookapi_views_data()  {
     ),
     'filter' => array(
       'handler' => 'views_handler_filter_string',
+    ),
+  );
+
+  // Graded date.
+  $data['gradebookapi_grade']['timestamp'] = array(
+    'title' => t('Date graded'),
+    'help' => t('Date on which the grade was last updated.'),
+    'field' => array(
+      'handler' => 'views_handler_field_date',
+      'click sortable' => TRUE,
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_date',
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
     ),
   );
 
@@ -226,6 +244,9 @@ function gradebookapi_views_handlers() {
       'gradebookapi_views_handler_filter_user_grade' => array(
         'parent' => 'views_handler_filter_boolean_operator',
       ),
+      'gradebookapi_views_handler_field_numeric' => array(
+        'parent' => 'views_handler_field_numeric',
+      ),
     ),
   );
 }
@@ -241,6 +262,12 @@ function gradebookapi_date_api_fields($field) {
     );
   }
   if ($field == 'gradebookapi_assignment.due_date') {
+    return array(
+      'sql_type' => DATE_UNIX, // DATE_ISO or DATE_UNIX or DATE_DATETIME
+      'tz_handling' => 'site', // 'site' or 'none' or 'date' or 'utc'
+    );
+  }
+  if ($field == 'gradebookapi_grade.timestamp') {
     return array(
       'sql_type' => DATE_UNIX, // DATE_ISO or DATE_UNIX or DATE_DATETIME
       'tz_handling' => 'site', // 'site' or 'none' or 'date' or 'utc'

@@ -821,7 +821,7 @@ function theme_gradebookapi_assignment_notice($node) {
       $output .= '<p>';
       $output .= '<span class = "gradebook-assignment-due">' . t('This assignment is due on') . ' ' . '</span>';
       $output .= '<span class = "gradebook-assignment-due-date">'. format_date($node->due_date, 'custom', 'F j, Y');
-      $output .= ' '. t('at') . ' ' . format_date($due_date, 'custom', 'h:i a') . '</span>';
+      $output .= ' '. t('at') . ' ' . format_date($node->due_date, 'custom', 'h:i a') . '</span>';
       $output .= '</p>';
     }
     $output .= '</div>';
