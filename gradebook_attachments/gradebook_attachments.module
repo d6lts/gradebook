@@ -239,7 +239,7 @@ function gradebook_attachments_form_alter(&$form, $form_state, $form_id) {
       '#required' => TRUE,
     );
   }
-  if (isset($form['type']) && $form['type']['#value'] .'_node_form' == $form_id) {
+  if (isset($form['type']['#value']) && $form['type']['#value'] .'_node_form' == $form_id) {
     $node = $form['#node'];
     $types = gradebookapi_get_assignment_types();
     if (in_array($node->type, $types)) {
@@ -444,6 +444,7 @@ function gradebook_attachments_upload_form_attach_another($form, &$form_state) {
  *   HTML to be added to the gradebook grade form.
  */
 function gradebook_attachments_gradebook_form_add_content($position, &$form, $id, $teacher) {
+  $output = '';
   switch ($position) {
     case 'note':
       if (isset($form['grade'][$id]['attachments']['files'])) {

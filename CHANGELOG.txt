@@ -1,5 +1,21 @@
 /* $Id$ */
 
+Gradebook 6.x.2.x-dev, 2010-08-17
+----------------------
+* by MGN: Fixed E_NOTICE warnings.
+* by MGN: Updated README.txt
+#864352 by MGN: Adding a new feature to grade individual responses and calculate the assignment grade.
+#809470 by MGN: Adding a new feature to send email notices when grades, assignments or responses are updated.
+* by MGN: code cleanup to meet Drupal coding standards.
+
+Gradebook 6.x.2.x-dev, 2010-08-14
+----------------------
+#865718 by MGN: Adding a views filter option to remove (or not) results when a grade has not been assigned.
+#877254 by MGN: Adding a views handler to allow text replacement when earned field is null.
+#877328 by MGN: Adding a date graded field for display, filtering and sorting in gradebook views.
+#870138 by MGN: Fixing a bug that produced incorrect due dates on assignment nodes. 
+* by MGN: Fixing earned and possible fields to have float options in views.
+
 Gradebook 6.x.2.x-dev, 2010-07-28
 ----------------------
 #866780 by MGN: Fixing bug that prevents teacher from modifying gradebook response form settings.

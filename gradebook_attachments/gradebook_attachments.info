@@ -8,4 +8,3 @@ dependencies[] = gradebook
 dependencies[] = upload
 core = 6.x
 
-

@@ -539,7 +539,7 @@ function theme_gradebook_attendance_student_form($form) {
  * @return NONE
  */
 function gradebook_attendance_form_alter(&$form, $form_state, $form_id) {
-  if (isset($form['type']) && $form['type']['#value'] . '_node_form' == $form_id) {
+  if (isset($form['type']['#value']) && $form['type']['#value'] . '_node_form' == $form_id) {
     $node = $form['#node'];
     $types = gradebookapi_get_assignment_types();
 
@@ -564,7 +564,7 @@ function gradebook_attendance_form_alter(&$form, $form_state, $form_id) {
         $form['gradebookapi']['gradebook_attendance']['grade_present'] = array(
           '#type' => 'textfield',
           '#title' => t('Points if Present'),
-          '#default_value' => ($node->grade_present ? $node->grade_present : '0'),
+          '#default_value' => (isset($node->grade_present) ? $node->grade_present : '0'),
           '#size' => 4,
           '#maxlength' => 10,
           '#required' => TRUE,
@@ -572,7 +572,7 @@ function gradebook_attendance_form_alter(&$form, $form_state, $form_id) {
         $form['gradebookapi']['gradebook_attendance']['grade_absent'] = array(
           '#type' => 'textfield',
           '#title' => t('Points if Absent'),
-          '#default_value' => ($node->grade_absent ? $node->grade_absent : '0'),
+          '#default_value' => (isset($node->grade_absent) ? $node->grade_absent : '0'),
           '#size' => 4,
           '#maxlength' => 10,
           '#required' => TRUE,
@@ -580,13 +580,13 @@ function gradebook_attendance_form_alter(&$form, $form_state, $form_id) {
         $form['gradebookapi']['gradebook_attendance']['grade_tardy'] = array(
           '#type' => 'textfield',
           '#title' => t('Points if Tardy'),
-          '#default_value' => ($node->grade_tardy ? $node->grade_tardy : '0'),
+          '#default_value' => (isset($node->grade_tardy) ? $node->grade_tardy : '0'),
           '#size' => 4,
           '#maxlength' => 10,
           '#required' => TRUE,
         );
 
-        if ($node->attendance_assignment) {
+        if (isset($node->attendance_assignment) && ($node->attendance_assignment == 1)) {
           // This will automatically be updated.
           $form['gradebookapi']['possible']['#type'] = 'hidden';
           $form['gradebookapi']['possible']['#value'] = 0;
@@ -1165,7 +1165,7 @@ function theme_gradebook_attendance_totals($totals, $export = FALSE) {
  *    The HTML string ready to display
  */
 function theme_gradebook_attendance_assignment_notice($node) {
-  if ($node->attendance_assignment == 1) {
+  if (isset($node->attendance_assignment) && ($node->attendance_assignment == 1)) {
     global $user;
     $account = user_load(array('uid' => $user->uid));
     // Retrieve gradebook name and assignment category.

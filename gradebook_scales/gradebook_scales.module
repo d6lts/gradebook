@@ -289,8 +289,8 @@ function gradebook_scales_scale_delete($sid) {
 
 function gradebook_scales_assignment_form_elements($node) {
   $form = array();
-  $oldsid = $node->sid;
-  $oldtax = $node->taxonomy;
+  $oldsid = isset($node->sid) ? $node->sid : NULL;
+  $oldtax = isset($node->taxonomy) ? $node->taxonomy : NULL;
   $gradebook = NULL;
   if (is_array($oldtax)) {  // an array of terms
     $vid = gradebookapi_get_vid();
@@ -362,7 +362,7 @@ function gradebook_scales_assignment_validate($node, $form = NULL) {
  * @return NONE
  */
 function gradebook_scales_form_alter(&$form, $form_state, $form_id) {
-  if (isset($form['type']) && $form['type']['#value'] .'_node_form' == $form_id) {
+  if (isset($form['type']['#value']) && $form['type']['#value'] .'_node_form' == $form_id) {
     $node = $form['#node'];
     $types = gradebookapi_get_assignment_types();
     if (!empty($types)) { // are we an assignment type?

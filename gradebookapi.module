@@ -6,21 +6,21 @@
  */
 
 /**
- * Implementation of hook_views_api().
+ * Implements hook_views_api().
  */
 function gradebookapi_views_api() {
   return array('api' => 2.0);
 }
 
 /**
- * Implementation of hook_perm().
+ * Implements hook_perm().
  */
 function gradebookapi_perm() {
   return array('admin gradebookapi');
 }
 
 /**
- * Implementation of hook_theme().
+ * Implements hook_theme().
  */
 function gradebookapi_theme() {
   return array(
@@ -29,7 +29,7 @@ function gradebookapi_theme() {
 }
 
 /**
- * Implementation of hook_menu().
+ * Implements hook_menu().
  */
 function gradebookapi_menu() {
   $items = array();
@@ -42,7 +42,7 @@ function gradebookapi_menu() {
     'access arguments' => array('access administration pages'),
     'file'             => 'system.admin.inc',
     'file path'        => drupal_get_path('module', 'system'),
-    );
+  );
 
   $items['admin/gradebook/gradebookapi'] = array(
     'title'            => 'Gradebook API',
@@ -59,7 +59,7 @@ function gradebookapi_menu() {
 }
 
 /**
- * Implementation of hook_help().
+ * Implements hook_help().
  */
 function gradebookapi_help($path, $arg) {
   switch ($path) {
@@ -74,11 +74,34 @@ function gradebookapi_help($path, $arg) {
 }
 
 /**
- * Implementation of hook_user().
+ * Implements hook_user().
  *
  * @return NONE
  */
 function gradebookapi_user($op, &$edit, &$account, $category = NULL) {
+  if (($op == 'register' && user_access('administer users')) ||
+      ($op == 'form' && $category == 'account' && gradebookapi_is_student(NULL, $account))) {
+    $form['gradebookapi'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Gradebook settings'),
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+    );
+    $form['gradebookapi']['grade_update_email'] = array(
+      '#title'          => t('Receive email notifications on grade update'),
+      '#type'           => 'checkbox',
+      '#default_value'  => $edit['grade_update_email'],
+      '#description' => t('Check the box to receive emails notifying you when assignment grades are updated.'),
+    );
+    $form['gradebookapi']['assignment_update_email'] = array(
+      '#title'          => t('Receive email notifications on assignment update'),
+      '#type'           => 'checkbox',
+      '#default_value'  => $edit['assignment_update_email'],
+      '#description' => t('Check the box to receive emails notifying you when assignments are posted or modified.'),
+    );
+    return $form;
+  }
+
   if ($op == 'delete' ) {
     drupal_set_message(t('Deleting gradebook grades for %name (uid %d) since account is being deleted',  array('%name' => $account->name, '%d' => $account->uid)));
     db_query("DELETE FROM {gradebookapi_grade} WHERE uid=%d", $account->uid);
@@ -88,9 +111,10 @@ function gradebookapi_user($op, &$edit, &$account, $category = NULL) {
 }
 
 /**
- *  gradebookapi_get_assignment_types
- *  @return 
- *    an array of content types that are used as gradebook assigments
+ * Retrieves the content types used for gradebook assignments.
+ *
+ * @return 
+ *   An array of content types that are used as gradebook assigments.
  */
 function gradebookapi_get_assignment_types() {
   $vid = gradebookapi_get_vid();
@@ -99,11 +123,11 @@ function gradebookapi_get_assignment_types() {
 }
 
 /**
- *  gradebookapi_get_vid
- *    retrieves the gradebook taxonomy vocabulary id for gradebook terms (gradebooks and categories),
- *    or creates one if it doesn't exist.
- *  @return 
- *    the taxonomy vocabulary id for the gradebook 
+ * Retrieves the gradebook taxonomy vocabulary id for gradebook terms (gradebooks and categories),
+ * or creates one if it doesn't exist.
+ *
+ * @return
+ *   The taxonomy vocabulary id for the gradebook.
  */
 function gradebookapi_get_vid() {
   $vid = variable_get('gradebookapi_nav_vocabulary', '');
@@ -131,12 +155,12 @@ function gradebookapi_get_vid() {
 }
 
 /**
- *  gradebookapi_gradebook_load
- *    retreives the gradebook term
- *  @param $tid
- *    the gradebook term id
- *  @return 
- *    the taxonomy term for the requested gradebook, or FALSE if it doesn't exist
+ * Retreives the gradebook taxonomy term from a term id.
+ *
+ * @param $tid
+ *   The gradebook term id.
+ * @return
+ *   The taxonomy term for the requested gradebook, or FALSE if it doesn't exist.
  */
 function gradebookapi_gradebook_load($tid) {
   if (_gradebookapi_is_root_term($tid)) {
@@ -147,12 +171,13 @@ function gradebookapi_gradebook_load($tid) {
   }
 }
 
-/** 
- *  Helper function that determines if a term id is the root of the taxonomy tree
- *  @param $tid 
- *    the gradbook (or category) term id
- *  @return 
- *    TRUE if $tid is the root, FALSE if it has parents
+/**
+ * Helper function that determines if a term id is the root of the taxonomy tree.
+ *
+ * @param $tid 
+ *   The gradbook (or category) term id.
+ * @return 
+ *   TRUE if $tid is the root, FALSE if it has parents
  */
 function _gradebookapi_is_root_term($tid) {
   $parents = taxonomy_get_parents($tid);
@@ -165,12 +190,11 @@ function _gradebookapi_is_root_term($tid) {
 }
 
 /**
- *  gradebookapi_get-tid_gradebook
- *    get the parent term (gradebook) for a child tid (assignment category)
- *  @param $tid
- *    the $tid for a gradebook category
- *  @return
- *    the parent gradebook (taxonomy term) for the category 
+ * Gets the parent term (gradebook) for a child tid (assignment category).
+ * @param $tid
+ *   The $tid for a gradebook category.
+ * @return
+ *   The parent gradebook (taxonomy term) for the category.
  */
 function gradebookapi_get_tid_gradebook($tid) {
   $parents = taxonomy_get_parents_all($tid);
@@ -178,24 +202,55 @@ function gradebookapi_get_tid_gradebook($tid) {
 }
 
 /**
- *  gradebookapi_select_nodes
+ * Returns an array of all gradebooks.
+ */
+function gradebookapi_get_all_gradebooks() {
+  $gradebooks = array();
+  $vid = gradebookapi_get_vid();
+  $result = db_query('SELECT DISTINCT t.tid FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = %d', $vid);
+  while ($tid = db_result($result)) {
+    $gradebooks[] = gradebookapi_gradebook_load($tid);
+  }
+  return $gradebooks;
+}
+
+/**
+ * Finds the gradebooks listing an assignment node.
  *
- *  Selects all the assignment nodes associated with a set of gradebook term ids. Particularly useful for a
- *  Gradebook page that lists all assignments in a gradebook and their grades
+ * @param $node
+ *   The assignment node.
+ * @return
+ *   An array of gradebook objects.
+ */
+function gradebookapi_assignment_get_gradebooks($node) {
+  $gradebooks = array();
+  $terms = gradebookapi_assignment_terms($node);
+  foreach ($terms as $term) {
+    if ($gradebook = gradebookapi_get_tid_gradebook($term->tid)) {
+      $gradebooks[] = $gradebook;
+    }
+  }
+  return $gradebooks;
+}
+
+/**
+ *  Selects all the assignment nodes associated with a set of gradebook term ids. 
+ *  Particularly useful for a Gradebook page that lists all assignments in a gradebook and their grades.
+ *
  *  @param $gradebook
- *    the gradebook object 
+ *    the gradebook object
  *  @param $tids
- *    an array of term ids (gradebook categories) to use in the search. If empty, use all gradebook categories 
+ *    an array of term ids (gradebook categories) to use in the search. If empty, use all gradebook categories
  *  @param $operator
  *    Optional: default is 'or' which ... otherwise ...
  *  @param $depth
- *    Optional: if set extend the taxonomy tree accordingly, otherwise include only root terms ? 
+ *    Optional: if set extend the taxonomy tree accordingly, otherwise include only root terms ?
  *  @param $pager
- *    Optional: Default is TRUE, perform a paged database query, set to FALSE to do a limited range query instead
+ *    Optional: Default is TRUE, perform a paged database query, set to FALSE to do a limited range query instead.
  *  @param $order
- *    Optional:  use this to modify the query sort order. The default it Sticky DESC, Created DESC
+ *    Optional:  use this to modify the query sort order. The default it Sticky DESC, Created DESC.
  *  @return
- *    Database query result
+ *    Database query result.
  */
 function gradebookapi_select_nodes($gradebook, $tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC') {
   $vid = gradebookapi_get_vid();
@@ -223,9 +278,8 @@ function gradebookapi_select_nodes($gradebook, $tids = array(), $operator = 'or'
 }
 
 /**
- *  Helper function to select assignment nodes affiliated with a set of gradebook categories  
- *  @see gradebookapi_select_nodes()
- *  
+ * Helper function to select assignment nodes affiliated with a set of gradebook categories.
+ * @see gradebookapi_select_nodes()
  */
 function _gradebookapi_select_nodes($tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC') {
   if (count($tids) > 0 ) {
@@ -276,18 +330,16 @@ function _gradebookapi_select_nodes($tids = array(), $operator = 'or', $depth = 
 }
 
 /**
- * gradebookapi_get_grade
+ * Retrieves the grade for the specified user and assignment. 
  *
- *  Retrieves the grade for the specified user and assignment. 
- *
- *  @param $uid
- *    the user id to use in the request
- *  @param $nid
- *    the assignment node id to use in the request
- *  @return $grade
- *    the grade object
- *    If more than one grade exists only the last query is returned. 
- *    If a grade has not been entered then a partial grade object with the possible value is returned.
+ * @param $uid
+ *   The user id to use in the request.
+ * @param $nid
+ *   The assignment node id to use in the request.
+ * @return $grade
+ *   The grade object.
+ *   If more than one grade exists only the last query is returned. 
+ *   If a grade has not been entered then a partial grade object with the possible value is returned.
  */
 function gradebookapi_get_grade($uid, $nid) {
   $grades = gradebookapi_get_grades(array('uid' => $uid, 'nid' => $nid));
@@ -305,13 +357,13 @@ function gradebookapi_get_grade($uid, $nid) {
 }
 
 /**
- *  gradebookapi_get_grades
- *    retrieves grade objects from the gradebookapi_grade and gradebookapi_assignment tables.
- *  @param $param
- *    an array of the form 'field' => $value to be used as the WHERE clause in an SQL query.
- *    Note: fields must be from gradebookapi_grade (uid, nid, earned, exempt, timestamp or note)
- *  @return $grades
- *    an array of grade objects matching the constraint requested through $param.
+ * Retrieves grade objects from the gradebookapi_grade and gradebookapi_assignment tables.
+ *
+ * @param $param
+ *   an array of the form 'field' => $value to be used as the WHERE clause in an SQL query.
+ *   Note: fields must be from gradebookapi_grade (uid, nid, earned, exempt, timestamp or note)
+ * @return $grades
+ *   an array of grade objects matching the constraint requested through $param.
  */
 function gradebookapi_get_grades($param = array()) {
   $grades = array();
@@ -336,30 +388,29 @@ function gradebookapi_get_grades($param = array()) {
 }
 
 /**
- *  gradebookapi_get_term_grade 
- *    retrieves grade information by category and user from the gradebookapi_cache table
+ * Retrieves grade information by category and user from the gradebookapi_cache table.
  *
- *  @param $uid
- *    The student user id
- *  @param $tid
- *    The grade category term id
- *  @return $grade
- *    A (partial) grade object
+ * @param $uid
+ *   The student user id
+ * @param $tid
+ *   The grade category term id
+ * @return $grade
+ *   A (partial) grade object
  */
 function gradebookapi_get_term_grade($uid, $tid) {
   $result = db_query("SELECT uid, tid, earned, possible FROM {gradebookapi_cache} WHERE tid=%d AND uid=%d", $tid, $uid);
   $grade = db_fetch_object($result);
- 
+
   return $grade;
 }
 
 /**
- *  gradebookapi_set_grade().
- *    Updates or inserts the grade information into the gradebookapi_grade table.
- *    The student's grades are then recalculated for each gradebook category.
- *  @param $grade
- *    the grade object 
- *  @ return NONE
+ * Updates or inserts the grade information into the gradebookapi_grade table.
+ * The student's grades are then recalculated for each gradebook category.
+ *
+ * @param $grade
+ *   The grade object.
+ * @ return NONE
  */
 function gradebookapi_set_grade($grade) {
   $old = gradebookapi_get_grade($grade->uid, $grade->nid);
@@ -387,6 +438,9 @@ function gradebookapi_set_grade($grade) {
     $func = $module.'_gradebookapi_grade';
     $func('set', $grade); //allows pass by reference!
   }
+  
+  gradebookapi_send_email('grade', array('assignment' => $node, 'grade' => $grade));
+
   if (module_exists('rules')) {
     $user = user_load(array('uid' => $grade->uid));
     rules_invoke_event('gradebookapi_set_grade', array('user' => $user, 'node' => &$node)); 
@@ -394,11 +448,12 @@ function gradebookapi_set_grade($grade) {
 }
 
 /**
- *  gradebookapi_rebuild_grades().
- *    Recursively re-calculates grades for each gradebook category and its children.
- *  @param $tid
- *    the gradebook category term id  (parent or child) 
- *  @ return NONE
+ * Recursively re-calculates grades for each gradebook category and its children.
+ *
+ * @param $tid
+ *   The gradebook category term id (parent or child).
+ *
+ * @return NONE
  */
 function gradebookapi_rebuild_grades($tid) {
   $children = taxonomy_get_children($tid, gradebookapi_get_vid());
@@ -413,15 +468,16 @@ function gradebookapi_rebuild_grades($tid) {
 }
 
 /**
- *  gradebookapi_clear_term_grades().
- *    Deletes term grades from the gradebookapi_cache table.
- *  @param $tid
- *    The gradebook category term id  (parent or child) 
- *  @param $recursive
- *    If TRUE, then all child term grades are also deleted.
- *  @param $start
- *    if TRUE, then term grades will be recalculated.
- *  @return NONE
+ * Deletes term grades from the gradebookapi_cache table.
+ *
+ * @param $tid
+ *   The gradebook category term id  (parent or child).
+ * @param $recursive
+ *   If TRUE, then all child term grades are also deleted.
+ * @param $start
+ *   If TRUE, then term grades will be recalculated.
+ *
+ * @return NONE
  */
 function gradebookapi_clear_term_grades($tid, $recursive = TRUE, $start = TRUE) {
   db_query("DELETE FROM {gradebookapi_cache} WHERE tid=%d", $tid);
@@ -442,15 +498,16 @@ function gradebookapi_clear_term_grades($tid, $recursive = TRUE, $start = TRUE) 
 }
 
 /**
- *  gradebookapi_calc_grades().
- *    Calculates the student grade for a given gradebook category.
- *  @param $tid
- *    The gradebook category term id  (parent or child) 
- *  @param $uid
- *    The student user id, if its < 1, then all grades are calculated.
- *  @param $recursive
- *    If TRUE, then calc grades for all gradebook category child terms. 
- *  @return NONE
+ * Calculates the student grade for a given gradebook category.
+ *
+ * @param $tid
+ *   The gradebook category term id (parent or child).
+ * @param $uid
+ *   The student user id, if its < 1, then all grades are calculated.
+ * @param $recursive
+ *   If TRUE, then calc grades for all gradebook category child terms.
+ *
+ * @return NONE
  */
 function gradebookapi_calc_grades($uid, $tid, $recursive=TRUE) {
   $gradebook = gradebookapi_get_tid_gradebook($tid);
@@ -501,11 +558,22 @@ function gradebookapi_calc_grades($uid, $tid, $recursive=TRUE) {
 }
 
 /**
- *  Allow one module a hook to weight the grade. If more than one, what to do with the several weights?
- *  avoid this by just popping one module name from the list of modules that implement
- *  hook_gradebookapi_weighted_grade().
+ * Provides a hook to weight the grade.
  *
- *  @return  associative array with keys 'earned' and 'possible' for the weighted earned and possible grades.
+ * If more than one module uses this hook, what to do with the several weights?
+ * Avoid this by just popping one module name from the list of modules that implement.
+ *
+ * @param $gid
+ *   The gradebook taxonomy (root) term id.
+ * @param $tid
+ *   The gradebook category.
+ * @param $catpossible
+ *   The possible points for the category.
+ * @param $catearned
+ *   The earned points for the category.
+ *
+ * @return 
+ *   Associative array with keys 'earned' and 'possible' for the weighted earned and possible grades.
  */
 function gradebookapi_weight_grade($gid, $tid, $catpossible, $catearned) {
   $modules = module_implements('gradebookapi_weighted_grade');
@@ -514,10 +582,13 @@ function gradebookapi_weight_grade($gid, $tid, $catpossible, $catearned) {
 }
 
 /**
- *  Provide a hook_gradebookapi_get_weights().
- *  Allow one module to specify the category weighting used by hook_gradebookapi_weighted_grade.
+ * Provides a hook to let other modules specify the category weighting used by hook_gradebookapi_weighted_grade.
  *
- *  @return 
+ * @param $gid
+ *   The gradebook taxonomy (root) term id.
+ *
+ * @return
+ *
  */
 function gradebookapi_get_weights($gid) {
   $modules = module_implements('gradebookapi_get_gradebook_weights');
@@ -526,15 +597,14 @@ function gradebookapi_get_weights($gid) {
 }
 
 /**
- *  gradebookapi_calc_term_grades().
- *  Calculate all student grades for a gradebook or gradebook category.
+ * Calculates all student grades for a gradebook or gradebook category.
  *
- *  @param $tid
- *    the taxonomy term id to use to lookup grades on associated assignment nodes
- *  @param $recursive
- *    If TRUE (default), then all gradebook category child terms are also calculated.
- *  @return
- *    NULL - no return value
+ * @param $tid
+ *   The taxonomy term id to use to lookup grades on associated assignment nodes.
+ * @param $recursive
+ *   If TRUE (default), then all gradebook category child terms are also calculated.
+ *
+ * @return NONE
  */
 function gradebookapi_calc_term_grades($tid, $recursive=TRUE) {
   $gradebook = gradebookapi_get_tid_gradebook($tid);
@@ -553,14 +623,15 @@ function gradebookapi_calc_term_grades($tid, $recursive=TRUE) {
 }
 
 /**
- *  gradebookapi_calc_assignment_grades().
- *    Calculates the student grades for a given set of gradebook categories associcated with an assignment.
- *  @param $node
- *    The assignment node 
- *  @param $terms
- *    An array of gradebook category terms to calculate the grade for.
- *    If empty, then grades will be calculated for all categories.
- *  @return NONE
+ * Calculates the student grades for a given set of gradebook categories associated with an assignment.
+ *
+ * @param $node
+ *   The assignment node 
+ * @param $terms
+ *   An array of gradebook category terms to calculate the grade for.
+ *   If empty, then grades will be calculated for all categories.
+ *
+ * @return NONE
  */
 function gradebookapi_calc_assignment_grades($node, $terms = array()) {
 
@@ -573,9 +644,7 @@ function gradebookapi_calc_assignment_grades($node, $terms = array()) {
 }
 
 /**
- * Implementation of hook_taxonomy().
- *
- * @return NONE
+ * Implements hook_taxonomy().
  */
 function gradebookapi_taxonomy($op, $type, $obj = NULL) {
   if ($obj['vid'] == gradebookapi_get_vid()) {
@@ -598,12 +667,13 @@ function gradebookapi_taxonomy($op, $type, $obj = NULL) {
 }
 
 /**
- *  gradebookapi_assigment_terms().
- *    get all of the gradebook taxonomy terms associated with a node
- *  @param $node
- *    the assignment node
- *  @return
- *    an array of gradebook taxonomy terms
+ * Retrieves all of the gradebook taxonomy terms associated with a node.
+ *
+ * @param $node
+ *   The assignment node.
+ *
+ * @return
+ *   An array of gradebook taxonomy terms.
  */
 function gradebookapi_assignment_terms($node) {
   $terms = array();
@@ -616,19 +686,19 @@ function gradebookapi_assignment_terms($node) {
       $terms[] = $term;
     }
   }
-
   return $terms;
 }
 
 /**
- *  gradebookapi_assigment_load().
- *    Retrieve the additional form fields from the gradebookapi_assignment database table.
- *    These fields will be added to assignment create node form.
- *    Called via hook_nodeapi (load).
- *  @param $node
- *    the assignment node
- *  @return
- *    an array of form default values
+ * Retrieves the additional form fields from the gradebookapi_assignment database table.
+ *
+ * These fields will be added to assignment create node form.
+ * Called via hook_nodeapi (load).
+ * @param $node
+ *   The assignment node.
+ *
+ * @return
+ *   An array of form default values.
  */
 function gradebookapi_assignment_load($node) {
   $additions = db_fetch_array(db_query('SELECT possible, publish_date, due_date FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid));
@@ -636,13 +706,14 @@ function gradebookapi_assignment_load($node) {
 }
 
 /**
- *  gradebookapi_assigment_insert().
- *    Insert additional assignment fields into the gradebookapi_assignment database table.
- *    The grades are then recalculated since the possible value, etc. may have changed.
- *    Called via hook_nodeapi (insert).
- *  @param $node
- *    the assignment node
- *  @return NONE
+ * Inserts additional assignment fields into the gradebookapi_assignment database table.
+ *
+ * The grades are then recalculated since the possible value, etc. may have changed.
+ *   Called via hook_nodeapi (insert).
+ * @param $node
+ *   The assignment node.
+ *
+ * @return NONE
  */
 function gradebookapi_assignment_insert($node) {
   require_once('gradebook.datetime.inc');
@@ -659,7 +730,7 @@ function gradebookapi_assignment_insert($node) {
   $now = time();
   $node->status =  ($now > $node->publish_date) ? 1 : 0;
 
-  // this assumes that gradebookapi has a lighter weight than any submodules so it is called first:
+  // This assumes that gradebookapi has a lighter weight than any submodules so it is called first.
   db_query("INSERT INTO {gradebookapi_assignment} (nid, possible, publish_date, due_date) VALUES (%d, %f, '%d', '%d')", $node->nid, $node->possible, $node->publish_date, $node->due_date);
 
   // we have to manually update terms as we can't control module order
@@ -668,12 +739,14 @@ function gradebookapi_assignment_insert($node) {
 }
 
 /**
- *  gradebookapi_assigment_update().
- *    Update additional assignment fields in the gradebookapi_assignment database table when the node is updated.
- *    The grades are then recalculated since the possible value, etc. may have changed.
- *    Called via hook_nodeapi (update).
+ * Updates additional assignment fields in the gradebookapi_assignment database table when the node is updated.
+ *
+ *  The grades are then recalculated since the possible value, etc. may have changed.
+ *  Called via hook_nodeapi (update).
+ *
  *  @param $node
- *    the assignment node
+ *    the assignment node.
+ *
  *  @return NONE
  */
 function gradebookapi_assignment_update(&$node) {
@@ -694,30 +767,33 @@ function gradebookapi_assignment_update(&$node) {
     gradebookapi_assignment_insert($node);
   }
 
-  // we have to manually update terms as we can't control module order
+  // We have to manually update terms as we can't control module order.
 
   taxonomy_node_save($node, $node->taxonomy);
 
   gradebookapi_calc_assignment_grades($node);
 
-  //if the term has changed, clear the term grade for the previous term
+  //if the term has changed, clear the term grade for the previous term.
 
   $tax = $node->taxonomy;
   $index = gradebookapi_get_vid();
   if ((isset($node->oldtid) && isset($tax[$index]) && $tax[$index] != $node->oldtid )) {
     gradebookapi_calc_term_grades($node->oldtid);
   }
+
+  gradebookapi_send_email('assignment', array('assignment' => $node));
+
 }
 
 /**
- *  gradebookapi_assigment_delete().
- *    Delete assignment field values from the gradebookapi_assignment database table when the node is deleted.
- *    The grades are then recalculated.
- *    Called via hook_nodeapi (delete).
+ * Deletes assignment field values from the gradebookapi_assignment database table when the node is deleted.
+ * The grades are then recalculated.
+ * Called via hook_nodeapi (delete).
+ *
  *  @param $node
- *    the assignment node
- *  @return
- *    NONE
+ *    The assignment node.
+ *
+ *  @return NONE
  */
 function gradebookapi_assignment_delete($node) {
   // Delete records for all students for this assignment node.
@@ -741,15 +817,16 @@ function gradebookapi_assignment_delete($node) {
 }
 
 /**
- *  gradebookapi_assigment_view().
- *    Add assignment field values to $node->content before rendering.
- *    Called via hook_nodeapi (view).
+ * Adds assignment field values to $node->content before rendering.
+ * Called via hook_nodeapi (view).
+ *
  *  @param $node
- *    the assignment node
+ *    The assignment node.
  *  @param $teaser
- *    the teaser parameter passed from node_view() 
+ *    The teaser parameter passed from node_view().
  *  @param $page
- *    the page parameter passed from node_view()
+ *    The page parameter passed from node_view().
+ *
  *  @return NONE
  */
 function gradebookapi_assignment_view(&$node, $teaser = FALSE, $page = FALSE) {
@@ -757,19 +834,16 @@ function gradebookapi_assignment_view(&$node, $teaser = FALSE, $page = FALSE) {
     '#value' => theme('gradebookapi_assignment_notice', $node),
     '#weight' => -100,
   );
-
-  // TODO: Check to see if user has a note or attached file in the gradebook for this
-  // assignment and provide a note for them so they can go and retrieve it.
-
 }
 
 /**
  * Determines if the node is an assignment node.
  *
- *  @param $node
- *    The assignment node
- *  @return
- *    TRUE if the node is an assignment node, FALSE otherwise.
+ * @param $node
+ *   The assignment node.
+ *
+ * @return
+ *   TRUE if the node is an assignment node, FALSE otherwise.
  */
 function gradebookapi_is_assignment_node($node) {
   $count = db_result(db_query('SELECT COUNT(nid) FROM {gradebookapi_assignment} WHERE nid = %d', $node->nid));
@@ -780,9 +854,10 @@ function gradebookapi_is_assignment_node($node) {
  * Provides a notice with assignment information on the assignment node. 
  *
  * @param $node
- *   The assignment node
+ *   The assignment node.
+ *
  * @return
- *   The HTML string ready to display
+ *   The HTML string ready to display.
  */
 function theme_gradebookapi_assignment_notice($node) {
   global $user;
@@ -800,7 +875,7 @@ function theme_gradebookapi_assignment_notice($node) {
       $categories[$term->tid] = $term->name;
     }
   }
-
+  $output = '';
   if (!empty($gnames)) {
     $output = '<div class = "gradebook-assignment-notice">';
     $output .= '<ul class = "gradebook-assignment-category">';
@@ -830,26 +905,25 @@ function theme_gradebookapi_assignment_notice($node) {
   return $output;
 }
 
-
 /**
- *  gradebookapi_assigment_form_elements().
- *    Prepare extra assignment fields for the node create forms.
- *    Called via hook_form_alter.
- *  @param $node
- *    the assignment node
- *  @return $form
- *    additional form array elements for the assignment create form.
+ * Prepares extra assignment fields for the node create forms.
+ * Called via hook_form_alter.
+ * @param $node
+ *   The assignment node.
+ *
+ * @return $form
+ *   Additional form array elements for the assignment create form.
  */
 function gradebookapi_assignment_form_elements($node) {
   require_once('gradebook.datetime.inc');
   $form = array();
-  // store the old gradebook term id in case user changes category
-  $oldtax = $node->taxonomy;
+  // Store the old gradebook term id in case user changes category.
+  $oldtax = isset($node->taxonomy) ? $node->taxonomy : NULL;
   $gradebook = NULL;
-  if (is_array($oldtax)) {  // an array of terms
+  if (is_array($oldtax)) {
     $vid = gradebookapi_get_vid();
     foreach ($oldtax as $term) {
-      if ($term->vid == $vid) {  // find the gradebook term
+      if ($term->vid == $vid) {
         $oldtid = $term->tid;
         $gradebook = gradebookapi_get_tid_gradebook($oldtid);
       }
@@ -867,24 +941,24 @@ function gradebookapi_assignment_form_elements($node) {
   $form['gradebookapi']['possible'] = array(
     '#type' => 'textfield',
     '#title' => t('Possible'),
-    '#default_value' => ($node->possible ? $node->possible : '0'),
+    '#default_value' => (isset($node->possible) ? $node->possible : '0'),
     '#size' => 10,
     '#maxlength' => 10,
     '#required' => TRUE,
   );
-  if ($node->due_date == NULL) {
+  if (!isset($node->due_date)) {
     $node->due_date = strtotime(variable_get('gradebookapi_assignments_interval', '+1 month'));
   }
 
-  if ($node->publish_date == NULL) {
+  if (!isset($node->publish_date)) {
     $node->publish_date = time();
   }
 
   $datetype = _gradebookapi_usedateapi() ? 'date_popup': 'date';
 
-  $default = is_numeric($node->due_date) ?  ( 
+  $default = is_numeric($node->due_date) ?  (
              ($datetype == 'date_popup') ?
-              _gradebookapi_unixtime2datepopup($node->due_date) : _gradebookapi_unixtime2drupaldate($node->due_date)) 
+              _gradebookapi_unixtime2datepopup($node->due_date) : _gradebookapi_unixtime2drupaldate($node->due_date))
              : $node->due_date;
 
   $form['gradebookapi']['due_date'] = array(
@@ -899,21 +973,22 @@ function gradebookapi_assignment_form_elements($node) {
     '#date_format' => 'Y-m-d H:i',
   );
 
-  if ($datetype == 'date') { // include a time field element
+  if ($datetype == 'date') {
+    // Include a time field element.
     $form['gradebookapi']['due_time'] = array(
       '#type' => 'test_time',
       '#title' => t('Due at'),
       '#default_value' => variable_get('due_time', array('hour' => 12, 'minute' => 0, 'meridiem' => 'pm')),
     );
   }
-  $default = is_numeric($node->publish_date) ?  ( 
+  $default = is_numeric($node->publish_date) ?  (
              ($datetype == 'date_popup') ?
              _gradebookapi_unixtime2datepopup($node->publish_date) : _gradebookapi_unixtime2drupaldate($node->publish_date))
              : $node->publish_date;
 
   $form['gradebookapi']['publish_date'] = array(
     '#prefix' => '<div class="date_widget">',
-    '#suffix' => '</div>',    
+    '#suffix' => '</div>',
     '#type' => $datetype,
     '#title' => t('Publish date'),
     '#default_value' => $default,
@@ -922,7 +997,8 @@ function gradebookapi_assignment_form_elements($node) {
     '#date_year_range' => '-3:+3',
     '#date_format' => 'Y-m-d H:i',
   );
-  if ($datetype == 'date') { // include a time field element
+  if ($datetype == 'date') {
+    // Include a time field element.
     $form['gradebookapi']['publish_time'] = array(
       '#type' => 'test_time',
       '#title' => t('Publish time'),
@@ -937,12 +1013,13 @@ function gradebookapi_assignment_form_elements($node) {
 }
 
 /**
- *  Implementation of hook_validate().
- *    Verify the form elements have acceptable values.
+ *  Implements hook_validate().
+ *
  *  @param $node
- *    the assignment node
+ *    The assignment node.
  *  @param $form
- *    the $form parameter passed from node_validate
+ *    The $form parameter passed from node_validate.
+ *
  *  @return NONE
  */
 function gradebookapi_assignment_validate($node, $form = NULL) {
@@ -963,7 +1040,7 @@ function gradebookapi_assignment_validate($node, $form = NULL) {
 }
 
 /**
- * Implementation of hook_submit().
+ * Implements hook_submit().
  * This checks if the assignment should be marked as published.
  */
 function gradebookapi_assignment_submit($form, &$form_state) {
@@ -988,28 +1065,24 @@ function gradebookapi_assignment_submit($form, &$form_state) {
 }
 
 /**
- * Implementation of hook_form_alter().
- *
- * @return NONE
+ * Implements hook_form_alter().
  */
 function gradebookapi_form_alter(&$form, $form_state, $form_id) {
-  if (isset($form['type']) && $form['type']['#value'] .'_node_form' == $form_id) {
+  if (isset($form['type']['#value']) && $form['type']['#value'] .'_node_form' == $form_id) {
     $node = $form['#node'];
     $types = gradebookapi_get_assignment_types();
 
-    // are we an assignment type?
+    // Is this an assignment type?
     if (!empty($types)) {
       if (in_array($node->type, $types)) {
         $form += gradebookapi_assignment_form_elements($node);
-      } 
+      }
     }
   }
 }
 
 /**
- * Implementation of hook_nodeapi().
- *
- * @return NONE
+ * Implements hook_nodeapi().
  */
 function gradebookapi_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
   $types =(array)gradebookapi_get_assignment_types();
@@ -1033,21 +1106,22 @@ function gradebookapi_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
         gradebookapi_assignment_validate($node, $a3);
         break;
     }
-  } 
+  }
 }
 
 /**
- *  gradebookapi_is_student_or_teacher().
- *    Determine whether a user is either a student or teacher for a given gradebook
- *    Used to control access to gradebook content
- *  @param $gradebook
- *    the gradebook object
- *  @param $account
- *    the user object
- *  @return
- *    TRUE if $account is a student, teacher or has uid=1, FALSE otherwise.
+ * Determines whether a user is either a student or teacher for a given gradebook.
+ * Used to control access to gradebook content.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $account
+ *   The user object.
+ *
+ * @return
+ *   TRUE if $account is a student, teacher or has uid=1, FALSE otherwise.
  */
-function gradebookapi_is_student_or_teacher($gradebook, $account = NULL) {
+function gradebookapi_is_student_or_teacher($gradebook = NULL, $account = NULL) {
   if (gradebookapi_is_student($gradebook, $account)) {
     return TRUE;
   }
@@ -1058,24 +1132,25 @@ function gradebookapi_is_student_or_teacher($gradebook, $account = NULL) {
 }
 
 /**
- *  gradebookapi_is_student().
- *    Determine whether a user is a student for a given gradebook
- *    Used to control access to gradebook content
- *  @param $gradebook
- *    the gradebook object
- *  @param $account
- *    the user object
- *  @return
- *    TRUE if $account is a student or has uid=1, FALSE otherwise.
+ * Determines whether a user is a student for a given gradebook.
+ * Used to control access to gradebook content.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $account
+ *   The user object.
+ *
+ * @return
+ *   TRUE if $account is a student or has uid=1, FALSE otherwise.
  */
-function gradebookapi_is_student($gradebook, $account = NULL) {
+function gradebookapi_is_student($gradebook = NULL, $account = NULL) {
   global $user;
 
   if (is_null($account)) {
     $account = user_load(array('uid' => $user->uid));
   }
 
-  // User #1 has all privileges:
+  // User #1 has all privileges.
   if ($account->uid == 1) {
     return TRUE;
   }
@@ -1089,24 +1164,25 @@ function gradebookapi_is_student($gradebook, $account = NULL) {
 }
 
 /**
- *  gradebookapi_is_teacher().
- *    Determine whether a user is a teacher for a given gradebook
- *    Used to control access to gradebook content
- *  @param $gradebook
- *    the gradebook object
- *  @param $account
- *    the user object
- *  @return
- *    TRUE if $account is a teacher or has uid=1, FALSE otherwise.
+ * Determines whether a user is a teacher for a given gradebook.
+ * Used to control access to gradebook content.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ * @param $account
+ *   The user object.
+ *
+ * @return
+ *   TRUE if $account is a teacher or has uid=1, FALSE otherwise.
  */
-function gradebookapi_is_teacher($gradebook, $account = NULL) {
+function gradebookapi_is_teacher($gradebook = NULL, $account = NULL) {
   global $user;
 
   if (is_null($account)) {
     $account = user_load(array('uid' => $user->uid));
   }
 
-  // User #1 has all privileges:
+  // User #1 has all privileges.
   if ($account->uid == 1) {
     return TRUE;
   }
@@ -1120,50 +1196,60 @@ function gradebookapi_is_teacher($gradebook, $account = NULL) {
 }
 
 /**
- *  gradebookapi_get_students().
- *    Gradebook UI modules determine which users are students and teachers.
- *    This is done by defining a function hook_gradebookapi_students that returns an array of user ids.
- *    The api calls all of these hook functions and merges the results into one array.
- *  @param $gradebook
- *    the gradebook object
- *  @return
- *    an array of student user ids.
+ * Gradebook UI modules determine which users are students and teachers.
+ *
+ * This is done by defining a function hook_gradebookapi_students that returns an array of user ids.
+ * The api calls all of these hook functions and merges the results into one array.
+ *
+ * @param $gradebook
+ *   The gradebook object. If NULL, then return teachers from all gradebooks.
+ *
+ * @return
+ *   An array of student user ids.
  */
-function gradebookapi_get_students($gradebook) {
+function gradebookapi_get_students($gradebook = NULL) {
   $students = array();
   $modules = module_implements('gradebookapi_students');
-  foreach ($modules as $module) {
-    $function = $module .'_gradebookapi_students';
-    $students = $function($gradebook, $students);
+  $gradebooks = is_null($gradebook) ? gradebookapi_get_all_gradebooks() : array($gradebook);
+  foreach ($gradebooks as $gradebook) {
+    foreach ($modules as $module) {
+      $function = $module . '_gradebookapi_students';
+      $students = $function($gradebook, $students);
+    }
   }
   return $students;
 }
 
 /**
- *  gradebookapi_get_teachers().
- *    Gradebook UI modules determine which users are teachers.
- *    This is done by defining a function hook_gradebookapi_teachers that returns an array of user ids.
- *    The api calls all of these hook functions and merges the results into one array.
- *  @param $gradebook
- *    the gradebook object
- *  @return
- *    an array of teacher user ids.
+ * Gradebook UI modules determine which users are teachers.
+ *
+ * This is done by defining a function hook_gradebookapi_teachers that returns an array of user ids.
+ * The api calls all of these hook functions and merges the results into one array.
+ *
+ * @param $gradebook
+ *   The gradebook object. If NULL, then return teachers from all gradebooks.
+ *
+ * @return
+ *   An array of teacher user ids.
  */
-function gradebookapi_get_teachers($gradebook) {
+function gradebookapi_get_teachers($gradebook = NULL) {
   $teachers = array();
   $modules = module_implements('gradebookapi_teachers');
-  foreach ($modules as $module) {
-    $function = $module .'_gradebookapi_teachers';
-    $teachers = $function($gradebook, $teachers);
+  $gradebooks = is_null($gradebook) ? gradebookapi_get_all_gradebooks() : array($gradebook);
+  foreach ($gradebooks as $gradebook) {
+    foreach ($modules as $module) {
+      $function = $module . '_gradebookapi_teachers';
+      $teachers = $function($gradebook, $teachers);
+    }
   }
   return $teachers;
 }
 
 /**
- * Implementation of hook_cron().
+ * Implements hook_cron().
  *
  * This function allows gradebookapi to insert its own actions when
- * the cron.php script is run  usually by the system cron system. This is useful
+ * the cron.php script is run, usually by the system cron system. This is useful
  * when performing periodic asynchronous tasks like, as in this case, checking to
  * see if any assignments should be published.
  *
@@ -1176,7 +1262,7 @@ function gradebookapi_cron() {
   $types = (array)gradebookapi_get_assignment_types();
 
   // Mark ready assignments as published.
-  $sql = "UPDATE {node} SET status = 1 WHERE type IN ( '". implode("', '", $types) ."') AND status = 0 AND nid IN (SELECT nid FROM {gradebookapi_assignment} WHERE publish_date <= %d)";
+  $sql = "UPDATE {node} SET status = 1 WHERE type IN ( '" . implode("', '", $types) . "') AND status = 0 AND nid IN (SELECT nid FROM {gradebookapi_assignment} WHERE publish_date <= %d)";
   $the_time = time();
   $query_result = db_query($sql, $the_time);
   //watchdog('gradebookapi', 'Checking assignment status using %sql at timestamp %time, returned %res.', array('%res' => $query_result, '%time' => $the_time, '%sql' => $sql), WATCHDOG_INFO);
@@ -1184,7 +1270,10 @@ function gradebookapi_cron() {
 }
 
 /**
+ * Modifies date formats and publishes node if past the publish date.
  *
+ * @param $node
+ *   The assignment node object.
  */
 function _gradebookapi_assignment_status(&$node) {
   require_once('gradebook.datetime.inc');
@@ -1200,18 +1289,165 @@ function _gradebookapi_assignment_status(&$node) {
   $node->status = ($now > $node->publish_date) ? 1 : 0;
 }
 
+/**
+ * Determines whether the date popup should be used to select a date.
+ *
+ * @return
+ *   TRUE if the date popup module exists and the use dateapi option is enabled.
+ */
 function _gradebookapi_usedateapi() {
   return (module_exists('date_popup') && variable_get('gradebookapi_use_dateapi', FALSE));
 }
 
 /**
- *  gradebookapi_load_marks().
- *    Gradebook UI modules can provide marks to replace numerical grades.
- *    This is done by defining a function hook_gradebookapi_marks that returns a string of not more than
- *    five characters. It only makes sense to take one mark...
+ * Gradebook UI modules provide marks to replace numerical grades.
+ *
+ * This is done by defining a function hook_gradebookapi_marks that returns a string of not
+ * more than five characters. It only makes sense to take one mark.
+ *
+ * @param $gid
+ *   The gradebook term id.
+ * @param $aid
+ *   The assignment id.
+ * @param $gradepoints.
+ *   The earned points for the assignment.
+ * @param $refresh
+ *   A flag. When set to TRUE, reloads the mark lookup table.
+ *
+ * @return
+ *   The mark corresponding to the grade.
  */
-
 function gradebookapi_load_marks($gid, $aid = -1, $gradepoints, $refresh = FALSE) {
   $mark = module_invoke_all('gradebookapi_marks', $gid, $aid, $gradepoints, $refresh);
   return array_pop($mark);
+}
+
+/**
+ * Send email to teachers when gradebook response has changed to completed.
+ *
+ * @param $type
+ *   A string indicating the type of email notice to send (either 'grade' or 'assignment').
+ * @param $objs
+ *   An array of objects to use to construct the mail message.
+ */
+function gradebookapi_send_email($type, $objs) {
+  // Obtain the gradebook(s) for the assignment.
+  $gradebooks = array();
+  $terms = gradebookapi_assignment_terms($objs['assignment']);
+  foreach ($terms as $term) {
+    // Retrieves the gradebook for this term and checks to see if the user in the gradebook.
+    $gradebooks[] = gradebookapi_get_tid_gradebook($term->tid);
+  }
+  $params = array();
+  // The sender of the email is the logged in user.
+  global $user;
+  $params['sender'] = user_load(array('uid' => $user->uid));
+  switch ($type) {
+    case 'assignment':
+      if (variable_get('gradebookapi_assignment_update_email_allowed', FALSE)) {
+        $params['assignment'] = $objs['assignment'];
+        // Notify all students in each gradebook for which this node is an assignment.
+        foreach ($gradebooks as $gradebook) {
+          $params['gradebook'] = $gradebook;
+          $students = gradebookapi_get_students($gradebook);
+          foreach ($students['uid'] as $uid) {
+            $account = user_load(array('uid' => $uid));
+            if ($account->assignment_update_email) {
+              $params['recipient'] = $account;
+              drupal_mail('gradebookapi', 
+                          'gradebookapi_' . $type, 
+                          $params['recipient']->mail,
+                          user_preferred_language($params['recipient']),
+                          $params,
+                          $params['sender']->mail);
+            }
+          }
+        }
+      }
+      break;
+    case 'grade':
+      if (variable_get('gradebookapi_grade_update_email_allowed', FALSE)) {
+        // Load the student user account.
+        $grade = $objs['grade'];
+        $account = user_load(array('uid' => $grade->uid));
+        if ($account->grade_update_email) {
+          $params['recipient'] = $account;
+          $params['gradebook'] = array_pop($gradebooks);
+          $params['assignment'] = node_load($objs['grade']->nid);
+          drupal_mail('gradebookapi',
+                      'gradebookapi_' . $type,
+                      $params['recipient']->mail,
+                      user_preferred_language($params['recipient']),
+                      $params,
+                      $params['sender']->mail);
+        }
+      }
+      break;
+  }
+}
+
+/**
+ * Implements hook_mail().
+ */
+function gradebookapi_mail($key, &$message, $params) {
+  $sender = $params['sender'];
+  $recipient = $params['recipient'];
+  $assignment = $params['assignment'];
+  $gradebook = $params['gradebook'];
+
+  // Select the appropriate subject and body type based on the mail key.
+
+  $subject = variable_get($key . '_update_email_subject', gradebookapi_email_format($key, 'subject'));
+  $body = variable_get($key . '_update_email_body', gradebookapi_email_format($key, 'body'));
+
+  $gradebookpath = 'gradebook/' . $gradebook->tid;
+  $assignmentpath = 'node/' . $node->nid;
+
+  $replace = array('%sender'       => $sender->name,
+                   '%recipient'    => $recipient->name,
+                   '%assignment'   => $assignment->title,
+                   '%coursename'   => $gradebook->name,
+                  '%assignmenturl' => url($assignmentpath, array('absolute' => TRUE)),
+                   '%gradebookurl' => url($gradebookpath, array('absolute' => TRUE)),
+                   '%sitename'     => variable_get('site_name', 'Drupal'),
+                  );
+  $message['subject']  = strtr($subject, $replace);
+  $message['body'] = strtr($body, $replace);
+}
+
+/**
+ * Returns the default email subject and body format for gradebookapi notifications.
+ *
+ * @param $type
+ *   The type of email message to prepare, either 'assignment' or 'grade'.
+ * @param $target
+ *   The format string to return, either 'subject' or 'body'.
+ *
+ * @return
+ *   A text string containing either the email subject or body format.
+ */
+function gradebookapi_email_format($type, $target) {
+  $text = '';
+  switch ($type) {
+    case 'gradebookapi_grade':
+      switch ($target) {
+        case 'subject':
+          $text = 'Your grade for %assignment has been assigned.';
+          break;
+        case 'body':
+          $text = 'Dear %recipient, a grade has been assigned for the assignment %assignment on %sitename. You can view your grade by going to %gradebookurl.';
+          break;
+      }
+      break;
+    case 'gradebookapi_assignment':
+      switch ($target) {
+        case 'subject':
+          $text = 'An assignment for %coursename has been published or updated.';
+          break;
+        case 'body':
+          $text = 'Dear %recipient, an assignment named %assignment has been published on %sitename. You can view the assignment by going to %assignmenturl.';
+          break;
+      }
+  }
+  return $text;
 }

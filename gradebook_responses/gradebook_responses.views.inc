@@ -11,19 +11,23 @@
  *
  * Database definition:
  * @code
- *  $schema['gradebook_responses'] = array(
- *    'fields' => array(
- *      'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
- *      'aid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
- *      'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
- *      'rstatus'     => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny'),
- *    ),
- *    'indexes' => array(
- *      'aid' => array('aid'),
- *      'uid' => array('uid'),
- *    ),
- *    'primary key' => array('nid'),
- *  );
+ *   $schema['gradebook_responses'] = array(
+ *   'fields' => array(
+ *     'nid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+ *     'aid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+ *     'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+ *     'rstatus'     => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny'),
+ *     'rearned'      => array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE),
+ *     'rnote'        => array('type' => 'text', 'unsigned' => FALSE, 'not null' => FALSE, 'size' => 'big'),
+ *     'rtimestamp'   => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+ *   ),
+ *   'indexes' => array(
+ *     'aid' => array('aid'),
+ *     'uid' => array('uid'),
+ *     'rstatus' => array('rstatus'),
+ *   ),
+ *   'primary key' => array('nid'),
+ * );
  * @endcode
  */
 
@@ -35,7 +39,12 @@ function gradebook_responses_views_data()  {
 
   $data = array();
   $data['gradebook_responses']['table']['group']  = t('Gradebook Responses');
-
+  $data['gradebookapi_responses']['table']['base'] = array(
+    'field' => 'nid',
+    'title' => t('Gradebook Responses'),
+    'help' => t("Information about a response."),
+    'weight' => -10,
+  );
   // tables + fields that can be used for SQL Joins
   $data['gradebook_responses']['table']['join'] = array(
     'node' => array(
@@ -50,6 +59,15 @@ function gradebook_responses_views_data()  {
       'left_field' => 'nid',
       'field' => 'aid',
     ),
+
+    'gradebookapi_assignment' => array(
+      'left_field' => 'nid',
+      'field' => 'aid',
+    ),
+
+
+'handler' => 'gradebookapi_views_join_multiple'
+
   );
 
  // Response Status.
@@ -62,7 +80,7 @@ function gradebook_responses_views_data()  {
     ),
     'filter' => array(
       'handler' => 'views_handler_filter_response_status',
-    ),
+   ),
     'sort' => array(
       'handler' => 'views_handler_sort',
     ),
@@ -70,6 +88,51 @@ function gradebook_responses_views_data()  {
       'handler' => 'views_handler_argument_string',
     ),
   );
+
+  // Graded date.
+  $data['gradebook_responses']['rtimestamp'] = array(
+    'title' => t('Date graded'),
+    'help' => t('Date on which the response grade was last updated.'),
+    'field' => array(
+      'handler' => 'views_handler_field_date',
+      'click sortable' => TRUE,
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_date',
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+  );
+
+  $data['gradebook_responses']['rearned'] = array(
+    'title' => t('Earned'),
+    'help' => t('Points earned for response.'),
+    'field' => array(
+      'handler' => 'gradebookapi_views_handler_field_numeric',
+      'click sortable' => TRUE,
+      'float' => TRUE,
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_numeric',
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+  );
+
+  $data['gradebook_responses']['rnote'] = array(
+    'title' => t('Note'),
+    'help' => t('Text explaining response grade to the student.'),
+    'field' => array(
+      'handler' => 'views_handler_field_markup',
+      'format' => FILTER_FORMAT_DEFAULT,
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_string',
+    ),
+  );
+
   $data['gradebook_responses']['nid'] = array(
     'title' => t('Response Node'),
     'help' => t('The node responding to the assignment.'),
@@ -80,6 +143,7 @@ function gradebook_responses_views_data()  {
       'label' => t('Response Node'),
     ),
   );
+
   $data['gradebook_responses']['aid'] = array(
     'title' => t('Assignment Node'),
     'help' => t('The assignment node associated with the response.'),
@@ -121,4 +185,16 @@ function gradebook_responses_views_handlers() {
       ),
     ),
   );
+}
+
+/**
+ * Implement hook_date_api_fields().
+ */
+function gradebook_responses_date_api_fields($field) {
+  if ($field == 'gradebook_responses.rtimestamp') {
+    return array(
+      'sql_type' => DATE_UNIX, // DATE_ISO or DATE_UNIX or DATE_DATETIME
+      'tz_handling' => 'site', // 'site' or 'none' or 'date' or 'utc'
+    );
+  }
 }

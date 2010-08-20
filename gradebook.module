@@ -389,7 +389,7 @@ function gradebook_edit_or_summary($gradebook) {
 function gradebook_list_page() {
   $vid = gradebookapi_get_vid();
   $header = array(
-    array('class' => 'gradebook-list-table', 'data' => t('Name'), 'field' => 't.name', 'sort' => 'asc',));
+    array('class' => 'gradebook-list-table', 'data' => t('Name'), 'field' => 't.name', 'sort' => 'asc'));
   $rows = array();
   $sql  = 'SELECT DISTINCT t.tid, t.name FROM {term_data} t INNER JOIN {term_hierarchy} h ON t.tid = h.tid WHERE h.parent = 0 AND t.vid = ' . $vid;
   $sql .= tablesort_sql($header, 'weight, ');
@@ -497,7 +497,7 @@ function gradebook_page_grade_summary_access($account) {
   global $user;
   // Only display a grade summary tab if the user is a student in some gradebook and
   // the logged in user is either the owner of the account or a gradebook administrator.
-  $count = db_result(db_query("SELECT COUNT(*) FROM {gradebookapi_cache} WHERE uid=%d", $account->uid));
+  $count = db_result(db_query("SELECT COUNT(*) FROM {gradebookapi_cache} WHERE uid = %d", $account->uid));
   return ($count > 0) && (($account->uid == $user->uid) || user_access('administer gradebook'));
 }
 
@@ -807,8 +807,12 @@ function theme_gradebook_teacher_page($gradebook, $assignments, $students, $stud
     $grade = gradebookapi_get_term_grade($uid, $gradebook->tid);
     $row[] = theme('gradebook_term_grade', $gradebook, $grade);
     foreach ($assignments as $assignment) {
+      if (!isset($sum[$assignment->nid])) {
+        $sum[$assignment->nid] = 0;
+        $sum_possible[$assignment->nid] = 0;
+      }
       $grade = $grades[$assignment->nid];
-      $row[] = theme('gradebook_assignment_grade',$gradebook, $grade);
+      $row[] = theme('gradebook_assignment_grade', $gradebook, $grade);
       if ((!isset($grade->exempt) || $grade->exempt == FALSE) && isset($grade->earned)) {
         $sum[$assignment->nid] += $grade->earned;
         $sum_possible[$assignment->nid] += $grade->possible;
@@ -1222,22 +1226,22 @@ function gradebook_teacher_settings($form_state, $gradebook) {
  * @ingroup themeable
  */
 function theme_gradebook_legend() {
-   $header = array( 
-     array('class' => 'gradebook-legend', 'data' => t('Item')),
-     array('class' => 'gradebook-legend', 'data' => t('Key'))
-    );
-   $rows = array();
-   $output = '';
-   $legend = module_invoke_all('gradebook_legend');
-   foreach ((array) $legend as $class => $label) {
-     if ($class){
-       $rows[] = array($label['item'], '<span class= "' . $class . ' gradebook-legend-item">' . $label['example'] . '</span>');
-     }
-   }
-   if (!empty($rows)) {
-   $output .= theme('table', $header, $rows, array('class' => 'gradebook-mini gradebook-legend'));
- 	}
-  return $output; 
+  $header = array( 
+    array('class' => 'gradebook-legend', 'data' => t('Item')),
+    array('class' => 'gradebook-legend', 'data' => t('Key'))
+   );
+  $rows = array();
+  $output = '';
+  $legend = module_invoke_all('gradebook_legend');
+  foreach ((array) $legend as $class => $label) {
+    if ($class) {
+      $rows[] = array($label['item'], '<span class= "' . $class . ' gradebook-legend-item">' . $label['example'] . '</span>');
+    }
+  }
+  if (!empty($rows)) {
+    $output .= theme('table', $header, $rows, array('class' => 'gradebook-mini gradebook-legend'));
+  }
+  return $output;
 }
 
 /**
@@ -1265,3 +1269,4 @@ function gradebook_gradebook_export() {
 if (module_exists('quiz')) {
   module_load_include('inc', 'gradebook', 'gradebook.quiz');
 }
+

@@ -81,7 +81,10 @@ function gradebook_grade_assignment_page($gradebook, $nid) {
  */
 function gradebook_grade_student_page($gradebook, $uid) {  // access is limited to teacher through menu system
   // get sort order for query
-  $sort = (isset($_GET['sort']) && ($_GET['sort'] == 'asc')) ? 'desc' : 'asc';
+  $default_sort = variable_get('gradebook_page_sort-'. $gradebook->tid, 'asc');
+  $sort = (isset($_GET['sort']) && ($_GET['sort'] == 'asc')) ? 'asc' : 'desc';
+  $default_order = variable_get('gradebook_page_order-'. $gradebook->tid, 'category');
+  $order = isset($_GET['order']) ? $_GET['order'] : $default_order;
 
   $account = user_load(array('uid' => $uid));
   if (gradebookapi_is_student($gradebook, $account)) {
@@ -122,11 +125,14 @@ function gradebook_grade_form($form_state, $gradebook, $grades) {
   $form = array('#theme' => 'gradebook_grade_form');
   $form['grade'] = array('#tree' => TRUE);
   $form['#grades'] = $grades;  // Make grades available for hook_form_alter
+  $form['#gradebook'] = $gradebook; // Make gradebook available for hook_form_alter
   foreach ($grades as $id => $grade) {
   //    $account = user_load(array('uid' => $grade['uid']));
     $uid = $grade['uid'];
     $display_name = $students['name'][$suid[$uid]];  // This is needed because module_invoke_all loses the keys.
-
+    $oldearned = isset($grade['earned']) ? $grade['earned'] : NULL;
+    $oldexempt = isset($grade['exempt']) ? $grade['exempt'] : 0;
+    $oldnote = isset($grade['note']) ? $grade['note'] : '';
     // Make the node object available for hook_form_alter.
     $node = node_load($grade['nid']);
     $form['grade'][$id]['#node'] = $node;
@@ -135,31 +141,32 @@ function gradebook_grade_form($form_state, $gradebook, $grades) {
     $form['grade'][$id]['user'] = array('#value' => $display_name);
     $form['grade'][$id]['node'] = array('#value' => $node->title);
     $form['grade'][$id]['#possible'] = $node->possible;
-    $percentage = ($grade['earned'] == '') ? NULL : ($node->possible != 0) ? 100.0*$grade['earned']/$node->possible : 0;
+    $percentage = (!isset($grade['earned'])) ? NULL : (isset($node->possible) && $node->possible != 0) ? 100.0*$grade['earned']/$node->possible : 0;
     $form['grade'][$id]['#oldpercentage'] = $percentage;
-    $form['grade'][$id]['#oldearned'] = $grade['earned'];
+    $form['grade'][$id]['#oldearned'] = $oldearned;
     $form['grade'][$id]['timestamp'] = array('#type' => 'value', '#value' => $grade['timestamp']);
-
     if ($teacher) {
       // Displays an edit form.
-      $form['grade'][$id]['earned'] = array('#type' => 'textfield', '#size' => 4, '#default_value' => $grade['earned'], '#field_suffix' => '/' . $node->possible);
+      $form['grade'][$id]['earned'] = array('#type' => 'textfield', '#size' => 4, '#default_value' => $oldearned, '#field_suffix' => '/' . $node->possible);
       $form['grade'][$id]['percentage'] = array('#type' => 'textfield', '#size' => 4, '#default_value' => $percentage, '#field_suffix' => '%');
-      $form['grade'][$id]['exempt'] = array('#type' => 'checkbox', '#default_value' => $grade['exempt']);
-      $form['grade'][$id]['note'] = array('#type' => 'textarea', '#cols' => 40, '#rows' => 6, '#default_value' => $grade['note']);
+      
+      $form['grade'][$id]['exempt'] = array('#type' => 'checkbox', '#default_value' => $oldexempt);
+      
+      $form['grade'][$id]['note'] = array('#type' => 'textarea', '#cols' => 40, '#rows' => 6, '#default_value' => $oldnote);
     }
     else {
       // Displays grades without an option for editing.
-      if ($grade['earned'] != '') {
+      if ($oldearned != '') {
         $grade_mark = gradebookapi_load_marks($gradebook->tid, $node->nid, $percentage, FALSE);
         if (!$grade_mark) {
-          $grade_mark = $grade['earned'];
+          $grade_mark = $oldearned;
           $suffix =  '/' . $node->possible;
         }
       $form['grade'][$id]['earned'] = array('#value' => $grade_mark, '#suffix' => $suffix);
       $form['grade'][$id]['percentage'] = array('#value' => $percentage, '#suffix' => '%');
       }
-      $form['grade'][$id]['exempt'] = array('#type' => 'checkbox', '#value' => $grade['exempt'], '#disabled' => TRUE);
-      $form['grade'][$id]['note'] = array('#value' => $grade['note']);
+      $form['grade'][$id]['exempt'] = array('#type' => 'checkbox', '#value' => $oldexempt, '#disabled' => TRUE);
+      $form['grade'][$id]['note'] = array('#value' => $oldnote);
     }
   }
   $modules = module_implements('gradebook_form_add_elements');
@@ -197,14 +204,20 @@ function gradebook_grade_form_submit($form, &$form_state) {
       $node = node_load($form_state['values']['grade'][$key]['nid']);
       $grade->due_date = $node->due_date;
       $grade->publish_date = $node->publish_date;
-      $percentage = $form_state['values']['grade'][$key]['percentage'];
-      $earned = $form_state['values']['grade'][$key]['earned'];
-      // Use whichever changed... if both changed, use points.
-      if ($earned != $form['grade'][$key]['#oldearned']) {
-        $grade->earned = $earned;
+      if ($form['grade'][$key]['percentage']['#disabled'] || $form['grade'][$key]['earned']['#disabled']) {
+        $grade->earned = $form['grade'][$key]['#oldearned']; 
+        $grade->percentage = $form['grade'][$key]['#oldpercentage'];
       }
-      elseif ($percentage != $form['grade'][$key]['#oldpercentage']) {
-        $grade->earned = $percentage*$form['grade'][$key]['#possible']/100.0;
+      else {
+        $percentage = $form_state['values']['grade'][$key]['percentage'];
+        $earned = $form_state['values']['grade'][$key]['earned'];
+        // Use whichever changed... if both changed, use points.
+        if ($earned != $form['grade'][$key]['#oldearned']) {
+          $grade->earned = $earned;
+        }
+        elseif ($percentage != $form['grade'][$key]['#oldpercentage']) {
+          $grade->earned = $percentage*$form['grade'][$key]['#possible']/100.0;
+        }
       }
       gradebookapi_set_grade($grade);
     }

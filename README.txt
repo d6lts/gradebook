@@ -148,6 +148,15 @@ designated gradebook administrator can take over, if desired.
    the appearance of the gradebook. See http://drupal.org/node/263967 for
    details on how to do this.
 
+10. Email notifications when grades or assignments are posted or modified can
+    be enabled at the Email Settings fieldset on the Gradebook API configuration
+    screen. The subject text and the body text of the notifications can also be
+    customized on this form. Notifications for grades and assignments (and those
+    provided by other Gradebook submodule) can be independently enabled. Once
+    enabled, students and teachers will be able to find a Gradebook Settings
+    fieldset when they edit their user profile with checkboxes that will allow
+    them to opt-in to receiving these emails.
+
 III. Usage (for students and teachers)
 --------------------------------------
 
@@ -276,23 +285,40 @@ IV. Description of Optional Submodules
     D. Teachers can see any student responses in the gradebook. They are listed
        with links below the title on the grade form.
     E. When a grade is given for an assignment with a response, the state of the
-       response node is changed to graded, and students cannot modify these form
-       elements anymore. (I am still developing these ideas, so feedback / use
-       cases are welcomed).
-    F. When assigning a grade, teachers can check 'redo permitted' to allow a
-       student to submit another response for the (graded) assignment. This will
-       change the response status to REDO for each response submitted for the
-       assignment. Unchecking the redo permitted box and submitting a grade will
-       return the response status to graded.
-    G. Restrictions can be placed on student rattachments. The default behavior
+       response node is changed to graded. Teachers can optionally prevent
+       students from modifying the response after it has been graded by enabling
+       the 'Prevent students from editing responses...' option on the Settings
+       page for their gradebook.
+    F. Individual resonses to an assignment can be graded via a grading form that
+       will be displayed whenever a teacher views a student response. To do this
+       the  'Add a grade form to student responses when viewed by the teacher'
+       option must be enabled on the Gradebook API configuration screen. If this
+       option is enabled, teachers can choose from several grading methods for
+       each class. For example, teachers can choose to only count the first (or
+       last) graded response, average all graded responses for an assignment, etc.
+       Teachers can also choose not use this feature and just enter the grade for
+       the assignment directly in the gradebook. The method is selected on the
+       Settings page for each gradebook.
+    G. When editing a grade in the gradebook, teachers can check 'redo permitted'
+       to allow a student to submit another response for the (graded) assignment.
+       This will change the response status to REDO for each response submitted
+       for the assignment. Unchecking the redo permitted box and submitting a
+       grade will return the response status to graded.
+    H. Restrictions can be placed on student rattachments. The default behavior
        is not to allow students to respond to an assignment after the due date.
        This default behavior can be changed for an individual gradebook through
        the settings tab on the gradebook page. Teachers can also override this
        default behavior for individual assignments by setting the response
        restrictions on the node edit page when creating assignments.
-    H. Grades with responses are emphasized on the gradebook page using a css
+    I. Grades with responses are emphasized on the gradebook page using a css
        style. The default emphasis can be adjusted by overriding or editing the
        gradebook_responses.css file.
+    J. Teachers can receive email notifications whenever a response to an
+       assignment is marked completed. Like the other gradebook email
+       notifications, this feature must be enabled and configured at the Email
+       Settings fieldset on the Gradebook API configuration screen. Also,
+       teachers can control whether or not they receive email notifications
+       through the Gradebook settings fieldset added to their user profile page.
 
 3.  Gradebook Scales and Weights allows teachers to define grading scales, i.e.
     letter grades mapped to numerical point ranges. Category weighting, in

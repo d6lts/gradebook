@@ -1,6 +1,8 @@
 <?php
 // $Id$
+
 /**
+ * @file
  * Field handler to provide a list of file attachments.
  */
 class views_handler_field_gradebook_attachments_fid extends views_handler_field_prerender_list {

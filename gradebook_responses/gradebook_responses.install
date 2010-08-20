@@ -17,6 +17,9 @@ function gradebook_responses_schema() {
       'aid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'uid'         => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
       'rstatus'     => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny'),
+      'rearned'      => array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE),
+      'rnote'        => array('type' => 'text', 'unsigned' => FALSE, 'not null' => FALSE, 'size' => 'big'),
+      'rtimestamp'   => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
     ),
     'indexes' => array(
       'aid' => array('aid'),
@@ -153,5 +156,16 @@ function gradebook_responses_update_6204() {
   // Add field to gradebookapi_assignment to indicate whether postdeadline responses are allowed for a given assignment.
   db_add_field($ret, 'gradebookapi_assignment', 'response_deadline', array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE, 'size' => 'tiny'));
 
+  return $ret;
+}
+
+/**
+ * Adds the rearned and rtimesteamp fields to the gradebook_responses database table.
+ */
+function gradebook_responses_update_6205() {
+  $ret = array();
+  db_add_field($ret, 'gradebook_responses', 'rearned', array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE));
+  db_add_field($ret, 'gradebook_responses', 'rtimestamp', array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0));
+  db_add_field($ret, 'gradebook_responses', 'rnote', array('type' => 'text', 'unsigned' => FALSE, 'not null' => FALSE, 'size' => 'big'));
   return $ret;
 }

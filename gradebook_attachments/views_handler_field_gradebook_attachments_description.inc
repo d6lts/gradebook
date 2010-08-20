@@ -2,8 +2,10 @@
 // $Id$
 
 /**
+ * @file
  * Field handler to provide a list of file descriptions.
  */
+
 class views_handler_field_gradebook_attachments_description extends views_handler_field_prerender_list {
   function init(&$view, &$options) {
     parent::init($view, $options);

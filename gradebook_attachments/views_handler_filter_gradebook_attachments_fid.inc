@@ -2,6 +2,7 @@
 // $Id$
 
 /**
+ * @file
  * Filter by whether or not a node has attached files from the gradebook_attachments module.
  */
 class views_handler_filter_gradebook_attachments_fid extends views_handler_filter_boolean_operator {

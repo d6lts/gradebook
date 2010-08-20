@@ -64,6 +64,73 @@ function gradebookapi_admin_settings() {
     '#required' => FALSE,
     '#weight' => -6,
   );
+
+  $form['email'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Email Settings'),
+    '#description' => t('Email notifications sent to teachers and students.'),
+    '#weight' => 0,
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+
+  $form['email']['gradebookapi_email_assignment'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Gradebook Assignments'),
+      '#description' => t('Send notification to teacher when a grade is entered or an assignment is posted.'),
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+    );
+
+  $form['email']['gradebookapi_email_assignment']['gradebookapi_assignment_update_email_allowed'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Notify students by email when an assignment is published or modified.'),
+    '#default_value' => variable_get('gradebookapi_assignment_update_email_allowed', 0),
+    '#description' => t('Check this to send students an email whenever an assignment is published or modified. Note that students must must also enable the "Receive email notifications on assignment update" option on their user account page.')
+   );
+
+  $form['email']['gradebookapi_email_assignment']['gradebookapi_assignment_update_email_subject'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Configure E-mail Subject'),
+    '#description' => t('This format will be used when sending the assignment update email notification.'),
+    '#default_value' => variable_get('gradebookapi_assignment_update_email_subject', gradebookapi_email_format('gradebookapi_assignment', 'subject')),
+  );
+
+  $form['email']['gradebookapi_email_assignment']['gradebookapi_assignment_update_email_body'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Configure E-mail body'),
+    '#description' => t('This format will be used when sending the assignment update email notification. %assignment(assignment title), %sitename, %recipient(teacher username), %response(response title), %responseurl(url to the response page) and %gradebookurl(url to the gradebook page) are placeholders.'),
+    '#default_value' => variable_get('gradebookapi_assignment_update_email_body', gradebookapi_email_format('gradebookapi_assignment', 'body')),
+  );
+
+  $form['email']['gradebookapi_email_grade'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Gradebook Grades'),
+    '#description' => t('Send notification to teacher when a grade is entered or an assignment is posted.'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+
+  $form['email']['gradebookapi_email_grade']['gradebookapi_grade_update_email_allowed'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Notify students by email when a grade has been updated.'),
+    '#default_value' => variable_get('gradebookapi_grade_update_email_allowed', 0),
+    '#description' => t('Check this to send students an email whenever an grade has been updated. Note that students must must also enable the "Receive email notifications on grade update" option on their user account page.')
+  );
+
+  $form['email']['gradebookapi_email_grade']['gradebookapi_grade_update_email_subject'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Configure E-mail Subject'),
+    '#description' => t('This format will be used when sending the grade update email notification.'),
+    '#default_value' => variable_get('gradebookapi_grade_update_email_subject', gradebookapi_email_format('gradebookapi_grade', 'subject')),
+  );
+
+  $form['email']['gradebookapi_email_grade']['gradebookapi_grade_update_email_body'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Configure E-mail body'),
+    '#description' => t('This format will be used when sending the grade update email notification. %assignment(assignment title), %sitename, %recipient(teacher username), %response(response title), %responseurl(url to the response page) and %gradebookurl(url to the gradebook page) are placeholders.'),
+    '#default_value' => variable_get('gradebookapi_grade_update_email_body', gradebookapi_email_format('gradebookapi_grade', 'body')),
+  );
   $form['#submit'][]= 'gradebookapi_admin_settings_submit'; // custom submit handler
   return system_settings_form($form);
 }

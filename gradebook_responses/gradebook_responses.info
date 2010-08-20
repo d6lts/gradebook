@@ -7,4 +7,3 @@ dependencies[] = gradebookapi
 dependencies[] = gradebook
 core = 6.x
 
-
