@@ -1,5 +1,4 @@
 <?php
-// $Id$
 /**
  * @file
  * Gradebook callback pages associated with displaying or editing a gradebook category

@@ -1,4 +1,3 @@
-; $Id$
 name = Gradebook Scales and Weights
 description = "Provides assignment scales and gradebook category weights."
 package = Gradebook

@@ -1,5 +1,4 @@
 <?php
-// $Id$
 /**
  * This file includes helper functions for creating reports for gradebook.module
  * This is code originally from webform - modified to suit gradebook needs

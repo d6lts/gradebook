@@ -1,5 +1,4 @@
 <?php
-// $Id$
 /**
  * @file
  * Render a field as a numeric value only if it is not NULL.

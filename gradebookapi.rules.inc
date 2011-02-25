@@ -1,5 +1,4 @@
 <?php
-// $Id$
 /**
  * @file gradebookapi.rules.inc
  * Rules integration for the Gradebookapi module.

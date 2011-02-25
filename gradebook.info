@@ -1,4 +1,3 @@
-; $Id$
 name = Gradebook
 description = "Provides a simple gradebook."
 package = Gradebook

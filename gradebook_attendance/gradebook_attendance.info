@@ -1,4 +1,3 @@
-; $Id$
 name = Gradebook Attendance
 description = Allows users to take attendance with their gradebooks.
 core = 6.x

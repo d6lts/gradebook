@@ -1,4 +1,3 @@
-; $Id$
 name = Gradebook Attachments
 description = "Provides file attachments for gradebook assignments."
 package = Gradebook

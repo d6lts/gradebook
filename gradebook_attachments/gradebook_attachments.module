@@ -1,5 +1,4 @@
 <?php
-// $Id$
 /**
  * @file
  * Provides file attachments for gradebook grades.

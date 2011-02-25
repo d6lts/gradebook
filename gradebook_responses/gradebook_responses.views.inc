@@ -1,5 +1,4 @@
 <?php
-// $Id$
 /**
  * @file
  * Views integration with the gradebook_responses module.

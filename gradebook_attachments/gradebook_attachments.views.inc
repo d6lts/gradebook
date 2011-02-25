@@ -1,5 +1,4 @@
 <?php
-// $Id$
 /**
  * @file
  * Views integration with Gradebook Attachments module.
