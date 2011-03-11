@@ -1257,6 +1257,10 @@ function theme_gradebook_responses_gradebook_form_title($nid, $uid) {
  */
 function gradebook_responses_gradebook_form_add_elements(&$form, &$form_state, $grades, $gradebook) {
   $teacher = gradebookapi_is_teacher($gradebook);
+  if (isset($form['default'])) {
+    $form['default']['redo'] = array('#type' => 'checkbox','#prefix' => '<div class = "gradebook-responses-redo-box">','#suffix' => '</div>');
+  }
+    
   foreach ($grades as $id => $grade) {
     $form['grade'][$id]['redo'] = array(
       '#type' => 'checkbox',
@@ -1266,8 +1270,9 @@ function gradebook_responses_gradebook_form_add_elements(&$form, &$form_state, $
     if ($teacher) {
       // If redo is checked when saving a grade it will reset the status of all responses to redo - 
       // indicating the assignment can be redone. To avoid accidently setting this, the default is
-      // FALSE. 
-      $form['grade'][$id]['redo']['#default_value'] = FALSE;
+      // FALSE.
+      $default = isset($form_state['storage']['default']) ? $form_state['storage']['default']['redo'] : FALSE;
+      $form['grade'][$id]['redo']['#default_value'] = $default;
     }
     else {
       $form['grade'][$id]['redo']['#value'] = isset($grade['redo']) ? $grade['redo'] : FALSE;
@@ -1291,7 +1296,25 @@ function gradebook_responses_gradebook_adjust_grade_form_table(&$form, $table) {
     $row['data'][] = $lastcol;
     $newrows[] = $row;
   }
-  return array('header' => $newheader, 'rows' => $newrows);
+  $newdrows = array();
+  if (isset($table['drows'])) {
+    foreach ($table['drows'] as $id => $drow) {
+      $lastdefaultcol = array_pop($drow['data']);
+      $drow['data'][] = array('data' => drupal_render($form['default']['redo']), 'class' => 'redo-box');
+      $drow['data'][] = $lastdefaultcol;
+      $newdrows[] = $drow;
+    }
+  }
+  $form['default_submit']['#submit'][] = 'gradebook_responses_grade_form_default_update';
+  return array('header' => $newheader, 'drows' => $newdrows, 'rows' => $newrows);
+}
+
+function gradebook_responses_grade_form_default_update($form, &$form_state) {
+  // Apply default grade to all grade form fields
+  $keys = array_keys($form_state['values']['grade']);
+  foreach ($keys as $key) {
+    $form_state['values']['grade'][$key]['redo'] = $form_state['values']['default']['redo'];
+  }
 }
 
 /**

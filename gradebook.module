@@ -254,7 +254,71 @@ function gradebook_menu() {
     'access arguments' => array(1),
   );
 
+  $items['gradebook/%gradebookapi_gradebook/js'] = array(
+    'type' => MENU_CALLBACK,
+    'title' => t('Javascript form'),
+    'page callback' => 'gradebook_earned_percentage_js',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+  );
+
   return $items;
+}
+
+/**
+ * Rebuild the gradebook form page when the earned or percentage field is updated.
+ * If the earned field is changed, the perctange field is rendered and vice versa.
+ * Only the modified row is rendered again.
+ *
+ * @param $gradebook
+ *   The gradebook object
+ * @param $id
+ *   The array index to be updated
+ * @param $field
+ *   The field (either earned or percentage) to be updated.
+ */
+function gradebook_earned_percentage_js($gradebook, $field, $id = 'default') {
+  // Build the new form.
+  $form_state = array('storage' => NULL, 'submitted' => FALSE);
+  $form_build_id = $_POST['form_build_id'];
+  // Get the form from the cache.
+  $form = form_get_cache($form_build_id, $form_state);
+  $args = $form['#parameters'];
+  $form_id = array_shift($args);
+  $form['#redirect'] = FALSE;
+  // We need to process the form. Prepare for that by setting a few variables.
+  $form['#post'] = $_POST;
+  $form['#programmed'] = FALSE;
+  $form_state['post'] = $_POST;
+  
+  // $form_state['storage']['#gradebook_ahah']['file'] has been set, to know
+  // which file should be loaded. This is necessary because we'll use the form
+  // definition itself rather than the cached $form.
+  if (isset($form_state['storage']['#gradebook_ahah']['file'])) {
+    require_once($form_state['storage']['#gradebook_ahah']['file']);
+  }
+  $form_state['submitted'] = TRUE;
+  if (!isset($_POST['op'])) {
+    $form['#validate'] = NULL;
+    $form['#submit'] = NULL;
+  }
+  // Build, validate and if possible, submit the form.
+  drupal_process_form($form_id, $form, $form_state);
+  // This call recreates the form relying solely on the form_state that the
+  // drupal_process_form set up.
+  $form = drupal_rebuild_form($form_id, $form_state, $args, $form_build_id);
+  // Get the form item we want to render.
+  if ($id  == 'default') {
+    $data = drupal_render($form['default'][$field]);
+  }
+  else {
+    $data = drupal_render($form['grade'][$id][$field]);
+  }
+  drupal_json(array(
+    'status'   => TRUE,
+    'data'     => theme('status_messages') . $data,
+    'settings' => array('ahah' => $settings['ahah']),
+  ));
 }
 
 /**
@@ -1269,3 +1333,59 @@ if (module_exists('quiz')) {
   module_load_include('inc', 'gradebook', 'gradebook.quiz');
 }
 
+/**
+ * This function records in which file your form definition lives and which
+ * file therefor should be loaded in case of an AHAH callback.
+ * (taken from the ahah_helper module)
+ *
+ * @param $form
+ *   The form structure.
+ * @param $form_state
+ *   The form state variable.
+ */
+function gradebook_ahah_form_register(&$form, &$form_state) {
+
+  // This is an AHAH-driven form, so enable caching.
+  $form['#cache'] = TRUE;
+
+  // Register the file.
+  if (!isset($form_state['storage']['#gradebook_ahah']['file'])) {
+    $menu_item = menu_get_item();
+    if ($menu_item['file']) {
+      $form_state['storage']['#gradebook_ahah']['file'] = $menu_item['file'];
+    }
+  }
+
+  // We remember all values the user last entered, even for fields that are
+  // currently invisible. That way, we can restore the last entered value
+  if (isset($form_state['values'])) {
+    // $form_state['storage'] must be initialized for gradebook_array_smart_merge() to
+    // work.
+    if (!isset($form_state['storage'])) {
+      $form_state['storage'] = array();
+    }
+    $form_state['storage'] = gradebook_array_smart_merge($form_state['storage'], $form_state['values']);
+  }
+}
+
+//----------------------------------------------------------------------------
+// Additional PHP functions.
+
+/**
+ * Smarter version of array_merge_recursive: overwrites scalar values.
+ *
+ * From: http://www.php.net/manual/en/function.array-merge-recursive.php#82976.
+ */
+function gradebook_array_smart_merge($array, $override) {
+  if (is_array($array) && is_array($override)) {
+    foreach ($override as $k => $v) {
+      if (isset($array[$k]) && is_array($v) && is_array($array[$k])) {
+        $array[$k] = gradebook_array_smart_merge($array[$k], $v);
+      }
+      else {
+        $array[$k] = $v;
+      }
+    }
+  }
+  return $array;
+}

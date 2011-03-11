@@ -1,3 +1,5 @@
+Issue #976024 by MGN: New feature provides default grade option and ajaxifies grade entry form.
+
 
 Gradebook 6.x.2.x-dev, 2010-08-17
 ----------------------
