@@ -401,14 +401,14 @@ function _gradebook_gradebookapi_role($gradebook, $role_name) {
   $role = array('uid' => array(), 'name' => array());
 
   if ($role_name == 'teacher' || $role_name == 'student') {
-    $var = 'gradebook_'. $role_name .'_rids';
+    $var = 'gradebook_' . $role_name . '_rids';
     $sel_roles = array_filter((array)variable_get($var, array()));
     if (count($sel_roles)) {
       if ($str_rids = implode(',', $sel_roles)) {
         $result = db_query("SELECT u.uid, u.name FROM {users} u INNER JOIN {users_roles} r ON u.uid = r.uid WHERE u.status <> 0 AND r.rid IN (" . $str_rids . ")");
         while ($user = db_fetch_object($result)) {
           $role['uid'][$user->uid] = $user->uid;
-          $role['name'][$user->uid] = $user->name;
+          $role['name'][$user->uid] = strip_tags(theme('username', $user));
         }
       }
     }
@@ -442,7 +442,7 @@ function gradebook_edit_or_summary($gradebook) {
     return t('Edit Grade');
   }
   else {
-    return  t('Assignment Summary');
+    return t('Assignment Summary');
   }
 }
 
@@ -502,7 +502,7 @@ function _gradebook_parent_select($root, $tid, $title) {
   $exclude[] = $tid;
 
   $tree = taxonomy_get_tree(gradebookapi_get_vid(), $root);
-  $options[$root] = '<'. t('root') .'>';
+  $options[$root] = '<' . t('root') . '>';
   if (!empty($tree)) {
     foreach ($tree as $term) {
       if (!in_array($term->tid, $exclude)) {
@@ -651,9 +651,9 @@ function gradebook_gradebook_page($gradebook, $uid = NULL, $export = FALSE) {
   $students = array();
   $student_grades = array();
   $assignment_order = array();
-  $default_order = variable_get('gradebook_page_order-'. $gradebook->tid, 'category');
+  $default_order = variable_get('gradebook_page_order-' . $gradebook->tid, 'category');
   $order = isset($_GET['order']) ? $_GET['order'] : $default_order;
-  $default_sort = variable_get('gradebook_page_sort-'. $gradebook->tid, 'asc');
+  $default_sort = variable_get('gradebook_page_sort-' . $gradebook->tid, 'asc');
   $sort = isset($_GET['sort']) ? (($_GET['sort'] == 'desc') ? 'DESC' : 'ASC') : $default_sort;
 
   $teacher = gradebookapi_is_teacher($gradebook);  
@@ -741,11 +741,11 @@ function theme_gradebook_student_page($gradebook, $assignments, $student, $stude
   $sort = (isset($_GET['sort']) && ($_GET['sort'] == 'asc')) ? 'desc' : 'asc';
 
   $headers = array(
-    'category' => array(l('category', 'gradebook/'. $gradebook->tid, array('query' => 'order=category&sort=' . $sort))),
+    'category' => array(l('category', 'gradebook/' . $gradebook->tid, array('query' => 'order=category&sort=' . $sort))),
     'weight' => ($showweight) ? array(t('weight')) : array(),
-    'possible' => array(l('possible', 'gradebook/'. $gradebook->tid, array('query' => 'order=possible&sort=' . $sort))),
-    'due'      => array(l('due date', 'gradebook/'. $gradebook->tid, array('query' => 'order=due&sort=' . $sort))),
-    'title'    => array(l('title', 'gradebook/'. $gradebook->tid, array('query' => 'order=title&sort=' . $sort))),
+    'possible' => array(l('possible', 'gradebook/' . $gradebook->tid, array('query' => 'order=possible&sort=' . $sort))),
+    'due'      => array(l('due date', 'gradebook/' . $gradebook->tid, array('query' => 'order=due&sort=' . $sort))),
+    'title'    => array(l('title', 'gradebook/' . $gradebook->tid, array('query' => 'order=title&sort=' . $sort))),
   );
   $headers['category'][] = array('data' => '', 'class' => 'category');
   if ($showweight) {
@@ -774,7 +774,7 @@ function theme_gradebook_student_page($gradebook, $assignments, $student, $stude
     }
     $headers['possible'][] = array('data' => $assignment->possible, 'class' => 'possible');
     $headers['due'][]      = array('data' => format_date($assignment->due_date, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y')), 'class' => 'date');
-    $headers['title'][]    = array('data' => l($assignment->title, 'node/'. $assignment->nid), 'class' => 'title');
+    $headers['title'][]    = array('data' => l($assignment->title, 'node/' . $assignment->nid), 'class' => 'title');
   }
   $rows = array();
   foreach ($student_grades as $uid => $grades) {
@@ -814,7 +814,7 @@ function theme_gradebook_teacher_page($gradebook, $assignments, $students, $stud
   $showweight = isset($weights['method']) && ($weights['method'] > 0);
   $sort = (isset($_GET['sort']) && ($_GET['sort'] == 'asc')) ? 'desc' : 'asc';
   $headers = array(
-    'category' => array(l('category', 'gradebook/'. $gradebook->tid, array('query' => 'order=category&sort='. $sort))),
+    'category' => array(l('category', 'gradebook/' . $gradebook->tid, array('query' => 'order=category&sort=' . $sort))),
     'weight' => ($showweight) ? array(t('weight')) : array(),
     'possible' => array(l('possible', 'gradebook/' . $gradebook->tid, array('query' => 'order=possible&sort=' . $sort))),
     'due'      => array(l('due date', 'gradebook/' . $gradebook->tid, array('query' => 'order=due&sort=' . $sort))),
@@ -931,8 +931,8 @@ function theme_gradebook_export_page($gradebook, $assignments, $students, $stude
 
   $sort = NULL;
   if ($order = isset($_GET['order']) ? $_GET['order'] : '') {
-    $sort .= 'order='. $order;
-    $sort .= '&sort='. (isset($_GET['sort']) ? (($_GET['sort'] == 'desc') ? 'asc' : 'desc') : 'asc');
+    $sort .= 'order=' . $order;
+    $sort .= '&sort=' . (isset($_GET['sort']) ? (($_GET['sort'] == 'desc') ? 'asc' : 'desc') : 'asc');
   }
 
   foreach ($assignments as $assignment) {
@@ -941,7 +941,7 @@ function theme_gradebook_export_page($gradebook, $assignments, $students, $stude
     foreach ($terms as $term) {
       if ($term->tid != $gradebook->tid) {
         if ($category) {
-          $category .= ', '. $term->name;
+          $category .= ', ' . $term->name;
         }
         else {
           $category .= $term->name;
@@ -950,7 +950,7 @@ function theme_gradebook_export_page($gradebook, $assignments, $students, $stude
     }
     $headers['category'][] = $category;
     if ($showweight) {
-      $headers['weight'][] = isset($weights['category'][$term->tid]) ? $weights['category'][$term->tid] .'%' : '0%';
+      $headers['weight'][] = isset($weights['category'][$term->tid]) ? $weights['category'][$term->tid] . '%' : '0%';
     }
     $headers['possible'][] = $assignment->possible;
     $headers['publish'][]  = format_date($assignment->publish_date, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y'));
@@ -1072,10 +1072,10 @@ function _gradebook_tablesort_sql($headers, $before = '') {
  * @ingroup themeable
  */
 function theme_gradebook_table($headers, $rows, $attributes = array(), $caption = NULL) {
-  $output = '<table'. drupal_attributes($attributes) .">\n";
+  $output = '<table' . drupal_attributes($attributes) . ">\n";
 
   if (isset($caption)) {
-    $output .= '<caption>'. $caption ."</caption>\n";
+    $output .= '<caption>' . $caption . "</caption>\n";
   }
 
   // Format the table header.
@@ -1117,14 +1117,14 @@ function theme_gradebook_table($headers, $rows, $attributes = array(), $caption 
       // Add odd/even class.
       $class = ($number % 2 == 1) ? 'even': 'odd';
       if (isset($attributes['class'])) {
-        $attributes['class'] .= ' '. $class;
+        $attributes['class'] .= ' ' . $class;
       }
       else {
         $attributes['class'] = $class;
       }
 
       // Build the row.
-      $output .= ' <tr'. drupal_attributes($attributes) .'>';
+      $output .= ' <tr' . drupal_attributes($attributes) . '>';
       $i = 0;
       foreach ($cells as $cell) {
         $cell = tablesort_cell($cell, $header, $ts, $i++);
@@ -1249,32 +1249,32 @@ function gradebook_teacher_settings($form_state, $gradebook) {
     '#description' => t('These settings apply only to this gradebook.'),
   );
 
-  $default = variable_get('gradebook_page_order-'. $gradebook->tid, 'category');
+  $default = variable_get('gradebook_page_order-' . $gradebook->tid, 'category');
 
-  $form['local']['gradebook_page_order-'. $gradebook->tid] = array(
-    '#type'        => 'radios',
-    '#title'       => t('Default sort order of gradebook page'),
-    '#type' => 'radios',
-    '#options' => array('category' => t('Alphabetically by Category'),
+  $form['local']['gradebook_page_order-' . $gradebook->tid] = array(
+    '#type'         => 'radios',
+    '#title'        => t('Default sort order of gradebook page'),
+    '#type'         => 'radios',
+    '#options'      => array('category' => t('Alphabetically by Category'),
                         'title' => t('Alphabetically by Assignment Title'),
                         'due' => t('Due Date'),
                         'publish' => t('Publish Date'),
                         'possible' => t('Points Possible'), ),
     '#default_value' => $default,
-    '#description' => t('Select the default order to sort the gradebook page.'),
-    '#required' => FALSE,
+    '#description'   => t('Select the default order to sort the gradebook page.'),
+    '#required'      => FALSE,
   );
 
-  $default = variable_get('gradebook_page_sort-'. $gradebook->tid, 'asc');
+  $default = variable_get('gradebook_page_sort-' . $gradebook->tid, 'asc');
 
-  $form['local']['gradebook_page_sort-'. $gradebook->tid] = array(
-    '#type'        => 'radios',
-    '#title'       => t('Default sort direction of gradebook page'),
-    '#type'        => 'radios',
-    '#options'     => array('asc' => t('Ascending'), 'desc' => t('Descending'), ),
+  $form['local']['gradebook_page_sort-' . $gradebook->tid] = array(
+    '#type'          => 'radios',
+    '#title'         => t('Default sort direction of gradebook page'),
+    '#type'          => 'radios',
+    '#options'       => array('asc' => t('Ascending'), 'desc' => t('Descending'), ),
     '#default_value' => $default,
-    '#description' => t('Select the default order to sort the gradebook page.'),
-    '#required' => FALSE,
+    '#description'   => t('Select the default order to sort the gradebook page.'),
+    '#required'      => FALSE,
   );
 
   return system_settings_form($form);

@@ -1,3 +1,4 @@
+Issue #1104714 by jzornig: Use themed username.
 Issue #976024 by MGN: New feature provides default grade option and ajaxifies grade entry form.
 
 
