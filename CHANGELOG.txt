@@ -1,6 +1,7 @@
+Issue #1039132 by MGN: Fixes PHP warning in gradebook_attendance module.
+Issue #1108764 by MGN: Student name not provided when deleting from roster.
 Issue #1104714 by jzornig: Use themed username.
 Issue #976024 by MGN: New feature provides default grade option and ajaxifies grade entry form.
-
 
 Gradebook 6.x.2.x-dev, 2010-08-17
 ----------------------

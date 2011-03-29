@@ -1,7 +1,7 @@
 <?php
 /**
  * @file
- * Lets users take attendance for each gradebook they have
+ * Lets users take attendance for each gradebook they have.
  */
 
 /**
@@ -432,7 +432,7 @@ function gradebook_attendance_confirm_delete_submit($form, &$form_state) {
   gradebook_attendance_calc_attendance_assignments($gradebook);
   drupal_set_message(t('The Attendance record of %date for %name has been deleted.', array('%date' => format_date($timestamp, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y')), '%name' => $gradebook->name), 0), 'status');
 
-  $form_state['redirect'] ='gradebook/'. $gradebook->tid .'/attendance';
+  $form_state['redirect'] ='gradebook/' . $gradebook->tid . '/attendance';
   return;
 }
 
@@ -905,7 +905,7 @@ function gradebook_attendance_page($gradebook, $uid = NULL, $export = FALSE) {
       }
       $last_suid = $suid;
     }
-    $timestamps = array_keys($attendance[$last_suid]);
+    $timestamps = is_array($attendance[$last_suid]) ? array_keys($attendance[$last_suid]) : array();
   }
   if ($teacher) {
     $func = ($export) ? 'gradebook_attendance_export_page' : 'gradebook_attendance_teacher_page';
@@ -1013,10 +1013,12 @@ function theme_gradebook_attendance_teacher_page($gradebook, $timestamps, $atten
   for ($i = 0; $i < 2; $i++) {
     $headers['edit'][] = $value;
   }
-  foreach ($timestamps as $timestamp) {
-    $headers['date'][] = array('data' => format_date($timestamp, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y'), 0), 'class' => 'gradebook-attendance-date');
-    $headers['delete'][] = array('data' => l('[delete]', 'gradebook/' . $gradebook->tid . '/attendance/delete/' . $timestamp), 'class' => 'gradebook-attendance-delete');
-    $headers['edit'][] = array('data' => l('[edit]', 'gradebook/' . $gradebook->tid . '/attendance/edit/' . $timestamp), 'class' => 'gradebook-attendance-edit');
+  if (is_array($timestamps) && !empty($timestamps)) {
+    foreach ($timestamps as $timestamp) {
+      $headers['date'][] = array('data' => format_date($timestamp, 'custom', variable_get('gradebookapi_assignments_date_format', 'm/d/Y'), 0), 'class' => 'gradebook-attendance-date');
+      $headers['delete'][] = array('data' => l('[delete]', 'gradebook/' . $gradebook->tid . '/attendance/delete/' . $timestamp), 'class' => 'gradebook-attendance-delete');
+      $headers['edit'][] = array('data' => l('[edit]', 'gradebook/' . $gradebook->tid . '/attendance/edit/' . $timestamp), 'class' => 'gradebook-attendance-edit');
+    }
   }
   $rows = array();
   foreach ($attendance as $uid => $record) {

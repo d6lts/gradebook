@@ -461,7 +461,7 @@ function gradebook_roster_confirm_delete(&$form_state, $gid, $uid) {
   $form = array();
   $form['#gid'] = $gid;
   $form['#uid'] = $uid;
-  $account = user_load(array('uid' => $entry['uid']) );
+  $account = user_load(array('uid' => $uid));
   return confirm_form(
     $form,
     t('Are you sure you want to delete the roster entry for %name?', array('%name' => $account->name)),
