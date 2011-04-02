@@ -1,3 +1,5 @@
+Issue #998842 by MGN: New feature provides a rebuild button on the gradebook
+roster form page that will delete and reinitialize the class roster.
 Issue #1039132 by MGN: Fixes PHP warning in gradebook_attendance module.
 Issue #1108764 by MGN: Student name not provided when deleting from roster.
 Issue #1104714 by jzornig: Use themed username.

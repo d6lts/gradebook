@@ -22,8 +22,8 @@ function gradebook_roster_menu() {
   $items = array();
   $items['gradebook/%gradebookapi_gradebook/roster'] = array(
     'title'            => 'Roster',
-    'page callback'    => 'drupal_get_form',
-    'page arguments'   => array('gradebook_roster_page', 1),
+    'page callback'    => 'gradebook_roster_page',
+    'page arguments'   => array(1),
     'access callback'  => 'gradebookapi_is_teacher',
     'access arguments' => array(1),
     'weight'           => 0,
@@ -75,7 +75,7 @@ function gradebook_roster_gradebook_grade_page_links($gradebook) {
  * @return
  *   An array of student user ids.
  */
-function gradebook_roster_gradebookapi_students($gradebook, $students = array('uid'=>array(), 'name'=>array())) {
+function gradebook_roster_gradebookapi_students($gradebook, $students = array('uid' => array(), 'name' => array())) {
   $roster_students = _gradebook_roster_gradebookapi_role($gradebook, 'student');
   return (count($roster_students['uid']) < 1) ? $students : $roster_students;
 }
@@ -92,7 +92,7 @@ function gradebook_roster_gradebookapi_students($gradebook, $students = array('u
  * @return
  *   An array of teacher user ids.
  */
-function gradebook_roster_gradebookapi_teachers($gradebook, $teachers = array('uid'=>array(), 'name'=>array())) {
+function gradebook_roster_gradebookapi_teachers($gradebook, $teachers = array('uid' => array(), 'name' => array())) {
   // If the roster has any teachers or assistants, return only the roster teachers and assistants.
   $roster_teachers = _gradebook_roster_gradebookapi_role($gradebook, 'teacher');
   $roster_assistants = _gradebook_roster_gradebookapi_role($gradebook, 'grading assistant');
@@ -243,6 +243,21 @@ function gradebook_roster_role_names($value = NULL) {
 }
 
 /**
+ * Page callback to display or rebuild the gradebook roster page.
+ *
+ * @param $gradebook
+ *   The gradebook object.
+ */
+function gradebook_roster_page($gradebook) {
+  if ((isset($_POST['op']) && $_POST['op'] == t('Rebuild Roster')) || isset($_POST['confirm'])) {
+    return drupal_get_form('gradebook_roster_confirm_rebuild', $gradebook->tid);
+  }
+  else {
+    return drupal_get_form('gradebook_roster_page_form', $gradebook);
+  }
+}
+
+/**
  * Form builder for the gradebook roster page.
  *
  * @param $gradebook
@@ -252,7 +267,7 @@ function gradebook_roster_role_names($value = NULL) {
  * @see gradebook_roster_page_return()
  * @ingroup forms
  */
-function gradebook_roster_page(&$form_state, $gradebook) {
+function gradebook_roster_page_form(&$form_state, $gradebook) {
   $form = array('#theme' => 'gradebook_roster_page');
   $form['gid'] = array('#type' => 'value', '#value' => $gradebook->tid);
   $form['newname'] = array(
@@ -275,7 +290,9 @@ function gradebook_roster_page(&$form_state, $gradebook) {
     '#default_value' => $roster_entry['grid'],
     '#required'      => FALSE,
   );
+
   $form['submit'] = array('#type' => 'submit', '#value' => t('Add'), '#submit' => array('gradebook_roster_form_submit'));
+  $form['rebuild'] = array('#type' => 'submit', '#value' => t('Rebuild Roster'));
   $form['return'] = array('#type' => 'submit', '#value' => t('Return to Gradebook'), '#submit' => array('gradebook_roster_page_return'));
   $form['#gradebook'] = $gradebook;
 
@@ -289,6 +306,38 @@ function gradebook_roster_page(&$form_state, $gradebook) {
  */
 function gradebook_roster_page_return($form, &$form_state) {
   $form_state['redirect'] = array('gradebook/' . $form_state['values']['gid']);
+}
+
+/**
+ * Form builder; Builds the confirmation form for rebuilding a class roster.
+ *
+ * @ingroup forms
+ * @see gradebook_roster_confirm_rebuild_submit()
+ */
+function gradebook_roster_confirm_rebuild(&$form_state, $gid) {
+  $form = array();
+  $form['#gid'] = $gid;
+  return confirm_form(
+    $form,
+    t('Are you sure you want to delete and rebuild the current roster for this class?'),
+    'gradebook/' . $gid . '/roster',
+    t('The roster will be restored to its initial value. User grades will not be affected. This action cannot be undone.'),
+    t('Rebuild'),
+    t('Cancel')
+  );
+}
+
+/**
+ * Process gradebook_roster_confirm_rebuild form submissions.
+ */
+function gradebook_roster_confirm_rebuild_submit($form, &$form_state) {
+  $gid = $form['#gid'];
+  db_query('DELETE FROM {gradebook_roster} WHERE gid = %d', $gid);
+  drupal_set_message(t('The gradebook roster has been deleted and reinitialized.'));
+  watchdog('gradebook_roster', 'gradebook_roster: deleted roster from gradebook %gid.', array('%uid' => $form['#uid'],'%gid' => $form['#gid']), WATCHDOG_NOTICE);
+  // Roster is actually rebuilt when the page is reloaded so this redirect will force the rebuild.
+  $form_state['redirect'] = 'gradebook/' . $gid . '/roster';
+  return;
 }
 
 /**
@@ -341,7 +390,7 @@ function theme_gradebook_roster_page($form) {
     $output .= '<div id="gradebook-roster-table-title">' . t('Current Roster') . '</div>';
     $output .= theme('table', $header, $rows);
   }
-  $output .= drupal_render($form['return']);
+  $output .= drupal_render($form['return']) . drupal_render($form['rebuild'])  ;
   $output .= drupal_render($form);
   return $output; 
 }
