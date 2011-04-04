@@ -19,6 +19,7 @@ function gradebook_responses_schema() {
       'rearned'      => array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE),
       'rnote'        => array('type' => 'text', 'unsigned' => FALSE, 'not null' => FALSE, 'size' => 'big'),
       'rtimestamp'   => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'rprivate'     => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny'),
     ),
     'indexes' => array(
       'aid' => array('aid'),
@@ -166,5 +167,14 @@ function gradebook_responses_update_6205() {
   db_add_field($ret, 'gradebook_responses', 'rearned', array('type' => 'float', 'unsigned' => FALSE, 'not null' => FALSE));
   db_add_field($ret, 'gradebook_responses', 'rtimestamp', array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0));
   db_add_field($ret, 'gradebook_responses', 'rnote', array('type' => 'text', 'unsigned' => FALSE, 'not null' => FALSE, 'size' => 'big'));
+  return $ret;
+}
+
+/**
+ * Adds the rprivate field to the gradebook_responses database table.
+ */
+function gradebook_responses_update_6206() {
+  $ret = array();
+  db_add_field($ret, 'gradebook_responses', 'rprivate', array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0, 'size' => 'tiny'));
   return $ret;
 }

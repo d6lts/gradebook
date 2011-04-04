@@ -1,16 +1,21 @@
+Issue #880520 by MGN: New feature allows teacher to decide whether response
+grade is private or public.
 Issue #998842 by MGN: New feature provides a rebuild button on the gradebook
 roster form page that will delete and reinitialize the class roster.
 Issue #1039132 by MGN: Fixes PHP warning in gradebook_attendance module.
 Issue #1108764 by MGN: Student name not provided when deleting from roster.
 Issue #1104714 by jzornig: Use themed username.
-Issue #976024 by MGN: New feature provides default grade option and ajaxifies grade entry form.
+Issue #976024 by MGN: New feature provides default grade option and ajaxifies
+grade entry form.
 
 Gradebook 6.x.2.x-dev, 2010-08-17
 ----------------------
 * by MGN: Fixed E_NOTICE warnings.
 * by MGN: Updated README.txt
-#864352 by MGN: Adding a new feature to grade individual responses and calculate the assignment grade.
-#809470 by MGN: Adding a new feature to send email notices when grades, assignments or responses are updated.
+#864352 by MGN: Adding a new feature to grade individual responses and
+calculate the assignment grade.
+#809470 by MGN: Adding a new feature to send email notices when grades,
+assignments or responses are updated.
 * by MGN: code cleanup to meet Drupal coding standards.
 
 Gradebook 6.x.2.x-dev, 2010-08-14

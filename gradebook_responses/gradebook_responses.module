@@ -302,7 +302,7 @@ function _gradebook_responses_load($node) {
  */
 function _gradebook_responses_insert($node) {
   if (is_numeric($node->aid)) {
-    db_query("INSERT INTO {gradebook_responses} (nid, aid, uid, rstatus) VALUES (%d, %d, %d, %d)", $node->nid, $node->aid, $node->uid, $node->rstatus);
+    db_query("INSERT INTO {gradebook_responses} (nid, aid, uid, rstatus, rprivate) VALUES (%d, %d, %d, %d, %d)", $node->nid, $node->aid, $node->uid, $node->rstatus, $node->rprivate);
   }
   // Check to see if mail notification should be sent.
   // If assignment status has changed to completed, then send it.
@@ -448,6 +448,12 @@ function gradebook_responses_grade_form(&$form_state, $gradebook, $assignment, $
     '#rows' => 6,
     '#default_value' => isset($node->rnote) ? $node->rnote : NULL,
   );
+  $form['rprivate'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Only allow teacher and response author to view the response grade and note.'),
+    '#default_value' => (isset($node->rprivate) ? $node->rprivate : 1),
+    '#required' => TRUE,
+  );
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Submit Response Grade'),
@@ -478,13 +484,13 @@ function gradebook_responses_grade_response($form, &$form_state) {
   $timestamp = time();
   if (is_numeric($form_state['values']['rearned'])) {
     // The response has been graded.
-    db_query("UPDATE {gradebook_responses} SET rnote = '%s', rearned = %d, rtimestamp = %d, rstatus = %d WHERE nid = %d", $form_state['values']['rnote'], $form_state['values']['rearned'], $timestamp, GRADEBOOK_RESPONSES_GRADED, $node->nid);
+    db_query("UPDATE {gradebook_responses} SET rnote = '%s', rearned = %d, rtimestamp = %d, rstatus = %d, rprivate = %d WHERE nid = %d", $form_state['values']['rnote'], $form_state['values']['rearned'], $timestamp, GRADEBOOK_RESPONSES_GRADED, $form_state['values']['rprivate'], $node->nid);
   }
   else {
     // If the response status was previously graded, since we are clearing the grade for this response,
     // set it to 'not set' (the teacher or student will have to refine this later) otherwise leave it alone.
     $rstatus = ($node->rstatus == GRADEBOOK_RESPONSES_GRADED) ? GRADEBOOK_RESPONSES_NOT_SET : $node->rstatus;
-    db_query("UPDATE {gradebook_responses} SET rnote = '%s', rearned = NULL, rtimestamp = %d, rstatus = %d WHERE nid = %d", $form_state['values']['rnote'], $timestamp, $rstatus, $node->nid);
+    db_query("UPDATE {gradebook_responses} SET rnote = '%s', rearned = NULL, rtimestamp = %d, rstatus = %d, rprivate = %d WHERE nid = %d", $form_state['values']['rnote'], $timestamp, $rstatus, $form_state['values']['rprivate'], $node->nid);
   }
   $method = variable_get('gradebook_responses_grading_method-' . $gradebook->tid, 0);
   gradebook_responses_calculate_grade($method, $node);
@@ -595,8 +601,8 @@ function theme_gradebook_responses_grade_form($form) {
   $row[] = array('data' => $output, 'class' => 'note');
   $rows[] = array('data' => $row);
   $output = theme('table', $header, $rows, array('class' => 'gradebook'));
+  $output .= '<div>' . drupal_render($form['rprivate']) . '</div>';
   $output .= '<div>' . drupal_render($form['submit']) . '</div>';
-  $output .= drupal_render($form['submit']);
   $output .= drupal_render($form);
   return $output;
 }
@@ -617,6 +623,7 @@ function theme_gradebook_responses_grade_form($form) {
 function theme_gradebook_responses_notice($assignment, $node) {
   global $user;
   $account = user_load(array('uid' => $node->uid));
+  $teacher = gradebookapi_is_teacher($gradebook);
   $who = ($user->uid == $node->uid) ? t('You have') : $account->name . ' ' . t('has');
 
   $num_responses = gradebook_responses_grade_response_number($assignment->nid, $node->uid);
@@ -632,7 +639,7 @@ function theme_gradebook_responses_notice($assignment, $node) {
       $terms = gradebookapi_assignment_terms($assignment);
       if (!empty($terms)) {
         $gradebook = gradebookapi_get_tid_gradebook($terms[0]->tid);
-        if (($user->uid == $node->uid) || gradebookapi_is_teacher($gradebook)) {
+        if (($user->uid == $node->uid) || $teacher) {
           $grade = gradebookapi_get_grade($node->uid, $assignment->nid);
           if (isset($grade->earned)) {
             $ret = theme('gradebook_assignment_grade', $gradebook, $grade);
@@ -659,24 +666,26 @@ function theme_gradebook_responses_notice($assignment, $node) {
   }
   $output .= ').';
   $output .= '</span></p>';
-  if (isset($node->rearned)) {
-    $output .= '<p><span class = "gradebook-response-grade">';
-    $output .= t('This response was graded on %date and assigned a score of %earned.', array('%date' => format_date($node->rtimestamp, 'custom', 'F j, Y h:i a'), '%earned' => $node->rearned));
-    $output .= '</span></p>';
+  // Only display the response grade if the viewer is the owner of the node, the teacher, or the response grade is not marked private.
+  if (($user->uid == $node->uid) || $teacher || !$node->rprivate) {
+    if (isset($node->rearned)) {
+      $output .= '<p><span class = "gradebook-response-grade">';
+      $output .= t('This response was graded on %date and assigned a score of %earned.', array('%date' => format_date($node->rtimestamp, 'custom', 'F j, Y h:i a'), '%earned' => $node->rearned));
+      $output .= '</span></p>';
 
-    // Add a note indicating the node was edited after it was graded, if that is the case.
-    $time_unit = 86400; // number of seconds in 1 day => 24 hours * 60 minutes * 60 seconds
-    $threshold = 1;
-    if ($node->changed && (round(($node->changed - $node->rtimestamp) / $time_unit) > $threshold)) {
-      $output .= t('The response content was modified on %changed, after the grade was assigned.', array(
-        '%changed' => format_date($node->changed, 'custom', 'F j, Y h:i a'),
-    ));
+      // Add a note indicating the node was edited after it was graded, if that is the case.
+      $time_unit = 86400; // number of seconds in 1 day => 24 hours * 60 minutes * 60 seconds
+      $threshold = 1;
+      if ($node->changed && (round(($node->changed - $node->rtimestamp) / $time_unit) > $threshold)) {
+        $output .= t('The response content was modified on %changed, after the grade was assigned.', array(
+          '%changed' => format_date($node->changed, 'custom', 'F j, Y h:i a'),));
+      }
     }
-  }
-  if (isset($node->rnote) && $node->rnote != '') {
-    $output .= '<p><span class = "gradebook-response-note">Note:';
-    $output .= '<blockquote>' . $node->rnote . '</blockquote>';
-    $output .= '</span></p>';
+    if (isset($node->rnote) && $node->rnote != '') {
+      $output .= '<p><span class = "gradebook-response-note">Note:';
+      $output .= '<blockquote>' . $node->rnote . '</blockquote>';
+      $output .= '</span></p>';
+    }
   }
   $output .= '</div>';
   return $output;
