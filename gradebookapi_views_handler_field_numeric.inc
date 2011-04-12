@@ -10,7 +10,6 @@ function option_definition() {
     $options = parent::option_definition();
 
     $options['null_text'] = array('default' => '');
-
     return $options;
   }
 

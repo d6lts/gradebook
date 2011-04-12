@@ -1,3 +1,4 @@
+Issue #1106634 by MGN: Add views support to display earned percentage.
 Issue #880520 by MGN: New feature allows teacher to decide whether response
 grade is private or public.
 Issue #998842 by MGN: New feature provides a rebuild button on the gradebook

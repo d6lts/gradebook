@@ -131,10 +131,10 @@ function gradebookapi_views_data()  {
   );
 
   $data['gradebookapi_grade']['earned'] = array(
-    'title' => t('Earned'),
+    'title' => t('Earned (Percentage)'),
     'help' => t('Points earned for assignment.'),
     'field' => array(
-      'handler' => 'gradebookapi_views_handler_field_numeric',
+      'handler' => 'gradebookapi_views_handler_field_earned',
       'click sortable' => TRUE,
       'float' => TRUE,
     ),
@@ -245,6 +245,9 @@ function gradebookapi_views_handlers() {
       ),
       'gradebookapi_views_handler_field_numeric' => array(
         'parent' => 'views_handler_field_numeric',
+      ),
+      'gradebookapi_views_handler_field_earned' => array(
+        'parent' => 'gradebookapi_views_handler_field_numeric',
       ),
     ),
   );
