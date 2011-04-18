@@ -1,3 +1,5 @@
+Issue #1123112 by MGN: Fixed Attendance record so that new students joining
+a class have previous attendances marked as not set.
 Issue #1106634 by MGN: Add views support to display earned percentage.
 Issue #880520 by MGN: New feature allows teacher to decide whether response
 grade is private or public.
