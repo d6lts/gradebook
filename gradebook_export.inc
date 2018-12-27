@@ -95,7 +95,7 @@ class gradebook_exporter {
 class gradebook_exporter_delimited extends gradebook_exporter {
   var $delimiter;
 
-  function gradebook_exporter_delimited($options) {
+  function __construct($options) {
     $this->delimiter = isset($options['delimiter']) ? $options['delimiter'] : ',';
     // Convert tabs.
     if ($this->delimiter == '\t') {
