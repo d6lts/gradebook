@@ -5,9 +5,3 @@ dependencies[] = gradebookapi
 dependencies[] = gradebook
 core = 6.x
 
-
-; Information added by Drupal 6 LTS vendors on 2018-12-27
-version = "6.x-2.0-beta3"
-core = "6.x"
-project = "gradebook"
-datestamp = "1545944348"
